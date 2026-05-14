@@ -376,7 +376,7 @@
     grid-template-columns: 64px 1fr 100px 100px;
     padding: 12px 20px;
     border-bottom: 1px solid rgba(42,74,50,0.5);
-    align-items: stretch; transition: background 0.15s;
+    align-items: center; transition: background 0.15s;
     animation: fadeIn 0.3s ease both;
   }
   .lb-row:last-child { border-bottom: none; }
@@ -386,7 +386,7 @@
   .lb-row.top-2 { background: rgba(176,190,197,0.04); }
   .lb-row.top-3 { background: rgba(205,127,50,0.04); }
 
-  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); text-align: center; }
   .rank.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
   .rank.silver { color: var(--silver); }
   .rank.bronze { color: var(--bronze); }
@@ -394,10 +394,9 @@
   .player-name {
     font-size: 14px; font-weight: 500; color: var(--white);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
-    display: block; margin-top: auto; margin-bottom: auto;
   }
 
-  .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; }
+  .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; align-self: stretch; }
 
   @media (max-width: 600px) {
     .lb-header, .lb-row { grid-template-columns: 48px 1fr 72px 72px; padding: 10px 12px; align-items: end; }
