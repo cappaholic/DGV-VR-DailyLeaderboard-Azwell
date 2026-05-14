@@ -215,42 +215,17 @@
   /* ── 9-Hole Scorecard ── */
   .scorecard-row {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
   }
   @media (max-width: 600px) {
-    .scorecard-row { grid-template-columns: 1fr; }
-  }
-
-  /* Each tray groups 3 scorecard pips for one course */
-  .scorecard-tray {
-    position: relative;
-  }
-  .scorecard-tray-pips {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    position: relative;
-    z-index: 1;
-  }
-  /* The tray underline is a bordered box sitting behind/under the pips */
-  .scorecard-tray-line {
-    position: absolute;
-    bottom: -2px;
-    left: -2px; right: -2px;
-    height: 8px;        /* just the corner radius, no vertical side visible */
-    border: 2.5px solid var(--tray-color, var(--border));
-    border-top: none;
-    border-radius: 0 0 6px 6px;
-    pointer-events: none;
-    z-index: 0;
+    .scorecard-row { grid-template-columns: repeat(5, 1fr); }
   }
 
   .scorecard-pip {
     background: rgba(0,0,0,0.35);
     border: 1px solid var(--pip-color, var(--border));
-    border-bottom: none;          /* tray line replaces the bottom border */
-    border-radius: 6px 6px 0 0;  /* flat bottom corners, rounded top */
+    border-radius: 6px;
     padding: 8px 4px;
     text-align: center;
   }
@@ -502,33 +477,6 @@
     <div class="scorecard-row" id="scorecardRow"></div>
   </div>
 
-  <!-- ── Config card (collapsible) ── -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-header" onclick="document.getElementById('configBody').classList.toggle('collapsed'); document.getElementById('collapseBtn').textContent = document.getElementById('configBody').classList.contains('collapsed') ? '▼ Show' : '▲ Hide'">
-      <div class="card-title" style="margin-bottom:0">⚙ Configuration</div>
-      <button class="collapse-btn" id="collapseBtn" onclick="event.stopPropagation(); document.getElementById('configBody').classList.toggle('collapsed'); this.textContent = document.getElementById('configBody').classList.contains('collapsed') ? '▼ Show' : '▲ Hide'">▲ Hide</button>
-    </div>
-    <div class="collapsible-body" id="configBody">
-      <div class="config-grid">
-        <div>
-          <div class="field-label">Session Token</div>
-          <div class="token-row">
-            <input type="password" id="tokenInput" placeholder="Session token auto-loads from server…" readonly/>
-          </div>
-        </div>
-        <div>
-          <div class="field-label">Par (Seeded)</div>
-          <input type="number" id="parInput" value="" min="1" max="99"
-            placeholder="—" readonly title="Auto-calculated from today's seed layout"/>
-        </div>
-      </div>
-      <p class="hint">
-        Session token auto-loads from the server.
-        Par is calculated automatically from the daily seed layout.
-      </p>
-    </div>
-  </div>
-
   <!-- ── Leaderboard section ── -->
   <div id="leaderboardSection" style="display:none">
     <div class="controls-row">
@@ -708,25 +656,16 @@ function renderLayout(seed, layout) {
     `;
   }).join('');
 
-  // Build 9-hole scorecard — 3 tray groups (one per course)
-  const scorecardHtml = layout.courses.map((entry, ci) => {
+  // Build 9-hole scorecard — flat grid
+  const scorecardHtml = layout.courses.flatMap((entry, ci) => {
     const color = courseColors[ci];
-    const pips = entry.holes.map((h, hi) => `
+    return entry.holes.map((h, hi) => `
       <div class="scorecard-pip" style="--pip-color:${color}">
         <span class="scorecard-pip-label">Hole</span>
         <span class="scorecard-pip-num">${ci * 3 + hi + 1}</span>
         <span class="scorecard-pip-par">Par ${h.par}</span>
       </div>
-    `).join('');
-
-    // Tray: a CSS-bordered div that provides matching rounded bottom corners
-    const tray = `<div class="scorecard-tray-line" style="--tray-color:${color}"></div>`;
-
-    return `
-      <div class="scorecard-tray">
-        <div class="scorecard-tray-pips">${pips}</div>
-        ${tray}
-      </div>`;
+    `);
   }).join('');
 
   document.getElementById('scorecardRow').innerHTML = scorecardHtml;
