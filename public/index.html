@@ -394,10 +394,10 @@
   .player-name {
     font-size: 14px; font-weight: 500; color: var(--white);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
-    display: flex; align-items: center; margin-top: auto; margin-bottom: auto;
+    display: block; margin-top: auto; margin-bottom: auto;
   }
 
-  .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; }
+  .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; }
 
   @media (max-width: 600px) {
     .lb-header, .lb-row { grid-template-columns: 48px 1fr 72px 72px; padding: 10px 12px; align-items: end; }
