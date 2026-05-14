@@ -386,7 +386,7 @@
   .lb-row.top-2 { background: rgba(176,190,197,0.04); }
   .lb-row.top-3 { background: rgba(205,127,50,0.04); }
 
-  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); display: flex; align-items: center; }
+  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); display: flex; align-items: center; justify-content: center; }
   .rank.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
   .rank.silver { color: var(--silver); }
   .rank.bronze { color: var(--bronze); }
@@ -394,15 +394,16 @@
   .player-name {
     font-size: 14px; font-weight: 500; color: var(--white);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
-    display: flex; align-items: center;
+    display: flex; align-items: center; margin-top: auto; margin-bottom: auto;
   }
+
+  .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; }
 
   @media (max-width: 600px) {
     .lb-header, .lb-row { grid-template-columns: 48px 1fr 72px 72px; padding: 10px 12px; align-items: end; }
+    .lb-row .score-cell { justify-content: flex-end; }
     .score-vs-par { font-size: 20px; }
   }
-
-  .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; }
   .score-vs-par { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; display: block; }
   .score-vs-par.under   { color: var(--green-neon); }
   .score-vs-par.over    { color: var(--red); }
