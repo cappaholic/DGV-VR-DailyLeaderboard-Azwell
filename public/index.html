@@ -386,7 +386,7 @@
   .lb-row.top-2 { background: rgba(176,190,197,0.04); }
   .lb-row.top-3 { background: rgba(205,127,50,0.04); }
 
-  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); display: flex; align-items: center; }
+  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); display: flex; align-items: center; justify-content: flex-start; }
   .rank.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
   .rank.silver { color: var(--silver); }
   .rank.bronze { color: var(--bronze); }
@@ -395,6 +395,7 @@
     font-size: 14px; font-weight: 500; color: var(--white);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
     display: flex; align-items: center;
+    margin-top: auto; margin-bottom: auto;
   }
 
   @media (max-width: 600px) {
