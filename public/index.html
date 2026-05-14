@@ -391,7 +391,15 @@
   .rank.silver { color: var(--silver); }
   .rank.bronze { color: var(--bronze); }
 
-  .player-name { font-size: 14px; font-weight: 500; color: var(--white); }
+  .player-name {
+    font-size: 14px; font-weight: 500; color: var(--white);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+
+  @media (max-width: 600px) {
+    .lb-header, .lb-row { grid-template-columns: 48px 1fr 72px 72px; padding: 10px 12px; }
+    .score-vs-par { font-size: 20px; }
+  }
 
   .score-cell { text-align: right; }
   .score-vs-par { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; }
