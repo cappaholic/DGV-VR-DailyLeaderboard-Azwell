@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/leaderboard/(.*)", "destination": "/api/leaderboard" },
+    { "source": "/api/cloudsave/(.*)",   "destination": "/api/cloudsave"   }
+  ]
+}
