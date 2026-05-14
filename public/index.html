@@ -398,17 +398,18 @@
   }
 
   @media (max-width: 600px) {
-    .lb-header, .lb-row { grid-template-columns: 48px 1fr 72px 72px; padding: 10px 12px; align-items: end; }
+    .lb-header, .lb-row { grid-template-columns: 48px 1fr 72px 72px; padding: 10px 12px; }
+    .lb-row .score-cell { justify-content: flex-end; }
     .score-vs-par { font-size: 20px; }
   }
 
-  .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; }
-  .score-vs-par { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; display: block; }
+  .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; }
+  .score-vs-par { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; display: block; line-height: 1; }
   .score-vs-par.under   { color: var(--green-neon); }
   .score-vs-par.over    { color: var(--red); }
   .score-vs-par.even    { color: var(--white); }
   .score-vs-par.unknown { color: var(--muted); font-size: 18px; }
-  .score-raw { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); text-align: right; margin-top: 1px; display: block; }
+  .score-raw { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); text-align: right; margin-top: 2px; display: block; line-height: 1.2; }
 
   /* ── Empty / Footer ── */
   .empty-state { text-align: center; padding: 64px 24px; color: var(--muted); }
@@ -848,7 +849,7 @@ function renderLeaderboard() {
           <div class="score-raw">${fmt.label}</div>
         </div>
         <div class="score-cell">
-          <div class="score-vs-par even" style="font-size:20px">${rawScore}</div>
+          <div class="score-vs-par even">${rawScore}</div>
           <div class="score-raw">total strokes</div>
         </div>
       </div>
