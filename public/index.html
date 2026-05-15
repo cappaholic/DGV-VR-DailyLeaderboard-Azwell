@@ -513,6 +513,15 @@ const PROJECT_ID     = '22c95154-2fe0-4923-8792-e2fe16880302';
 const LEADERBOARD_ID = 'daily_challenge';
 const PROXY          = '';
 
+// ── Daily reset time (UTC) ──────────────────────────────────────────
+//  The leaderboard resets at 8:00 PM EST daily.
+//  EST = UTC-5  →  reset at 01:00 UTC  (RESET_HOUR_UTC = 1)
+//  EDT = UTC-4  →  reset at 00:00 UTC  (RESET_HOUR_UTC = 0)
+//  CET = UTC+1  →  reset at 19:00 UTC  (RESET_HOUR_UTC = 19)
+//  CEST= UTC+2  →  reset at 18:00 UTC  (RESET_HOUR_UTC = 18)
+//  If the reset time ever drifts (e.g. seasonal DST), update this one value.
+const RESET_HOUR_UTC = 0;
+
 let allScoresGlobal = [];
 let globalRanks     = [];
 let totalScores     = 0;
@@ -525,17 +534,19 @@ let viewingYesterday      = false;
 let snapshotTaken         = false;
 const YESTERDAY_KEY       = 'dgvr_yesterday_snapshot';
 
-function getYesterdayDateKey() {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+// Date keys are based on the 8 PM EST (01:00 UTC) reset boundary.
+// "Today" = the current challenge window's start timestamp (ISO date of the 01:00 UTC anchor).
+function getChallengeWindowStartUTC() {
+  return getDailyWindow().startUTC;
 }
 
 function getTodayDateKey() {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-    .toISOString().slice(0, 10);
+  return getChallengeWindowStartUTC().toISOString().slice(0, 10);
+}
+
+function getYesterdayDateKey() {
+  const start = getChallengeWindowStartUTC();
+  return new Date(start.getTime() - 86400000).toISOString().slice(0, 10);
 }
 
 function saveSnapshot() {
@@ -798,11 +809,15 @@ function renderLayout(seed, layout) {
 
 // ═══════════════════════════════════════════════════════════════════
 //  Countdown + daily window
+//  Reset boundary defined by RESET_HOUR_UTC above.
 // ═══════════════════════════════════════════════════════════════════
 function getDailyWindow() {
   const now = new Date();
-  const s = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  return { startUTC: s, endUTC: new Date(s.getTime() + 86400000) };
+  // Find the most recent 01:00 UTC at or before now
+  const candidate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), RESET_HOUR_UTC, 0, 0, 0));
+  const startUTC = (candidate <= now) ? candidate : new Date(candidate.getTime() - 86400000);
+  const endUTC   = new Date(startUTC.getTime() + 86400000);
+  return { startUTC, endUTC };
 }
 
 function initDailyWindow() {
