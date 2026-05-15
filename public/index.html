@@ -478,7 +478,7 @@
       <div class="results-count" id="resultsCount"></div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
-        <button class="refresh-btn" onclick="showTodayLeaderboard()">↻ Refresh</button>
+        <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
       </div>
     </div>
     <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(240,180,41,0.2);">
@@ -603,6 +603,45 @@ function showTodayLeaderboard() {
   document.getElementById('yesterdayBanner').style.display = 'none';
   updateYesterdayBtn();
   autoLoadToken();
+}
+
+// Refresh only the leaderboard rows without hiding the section or jumping the page
+async function refreshLeaderboardOnly() {
+  if (!accessToken) { autoLoadToken(); return; }
+  if (viewingYesterday) { showTodayLeaderboard(); return; }
+
+  const btn = document.getElementById('refreshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
+
+  try {
+    const first = await fetchScoresPage(accessToken, 0, 100);
+    totalScores = first.total || (first.results || []).length;
+    const pages = [first.results || []];
+
+    if (totalScores > 100) {
+      const fetches = [];
+      for (let offset = 100; offset < totalScores; offset += 100) {
+        fetches.push(fetchScoresPage(accessToken, offset, 100));
+      }
+      const rest = await Promise.all(fetches);
+      rest.forEach(r => pages.push(r.results || []));
+    }
+
+    allScoresGlobal = pages.flat();
+    globalRanks     = computeTiedRanks(allScoresGlobal);
+
+    if (allScoresGlobal.length > 0) {
+      renderLeaderboard();
+      document.getElementById('leaderboardSection').style.display = 'block';
+      document.getElementById('emptyState').style.display = 'none';
+    }
+  } catch (err) {
+    console.error('Refresh failed:', err);
+    // If token expired, fall back to a full reload
+    if (err.message && err.message.includes('401')) { autoLoadToken(); return; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+  }
 }
 
 function renderSnapshotLeaderboard(snap) {
