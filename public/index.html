@@ -476,7 +476,13 @@
   <div id="leaderboardSection" style="display:none">
     <div class="controls-row">
       <div class="results-count" id="resultsCount"></div>
-      <button class="refresh-btn" onclick="autoLoadToken()">↻ Refresh</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
+        <button class="refresh-btn" onclick="showTodayLeaderboard()">↻ Refresh</button>
+      </div>
+    </div>
+    <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(240,180,41,0.2);">
+      📅 Viewing Yesterday's Leaderboard
     </div>
     <div class="leaderboard">
       <div class="lb-header">
@@ -512,6 +518,126 @@ let globalRanks     = [];
 let totalScores     = 0;
 let accessToken     = null;
 let seededPar       = null;
+
+// ── Yesterday's leaderboard ──
+let yesterdaySnapshot     = null;  // { scores, ranks, total, par, dateKey }
+let viewingYesterday      = false;
+let snapshotTaken         = false;
+const YESTERDAY_KEY       = 'dgvr_yesterday_snapshot';
+
+function getYesterdayDateKey() {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function getTodayDateKey() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    .toISOString().slice(0, 10);
+}
+
+function saveSnapshot() {
+  if (allScoresGlobal.length === 0) return;
+  const snap = {
+    dateKey : getTodayDateKey(),
+    scores  : allScoresGlobal,
+    ranks   : globalRanks,
+    total   : totalScores,
+    par     : seededPar
+  };
+  try { localStorage.setItem(YESTERDAY_KEY, JSON.stringify(snap)); } catch(e) {}
+  yesterdaySnapshot = snap;
+  snapshotTaken = true;
+}
+
+function loadSnapshotFromStorage() {
+  try {
+    const raw = localStorage.getItem(YESTERDAY_KEY);
+    if (!raw) return;
+    const snap = JSON.parse(raw);
+    // Only use it if it's from yesterday relative to now
+    if (snap.dateKey === getYesterdayDateKey()) {
+      yesterdaySnapshot = snap;
+    }
+  } catch(e) {}
+}
+
+function updateYesterdayBtn() {
+  const btn = document.getElementById('yesterdayBtn');
+  if (!btn) return;
+  if (yesterdaySnapshot) {
+    btn.style.display = '';
+    btn.textContent = viewingYesterday ? "Today's Leaderboard" : "Yesterday's Leaderboard";
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function toggleYesterdayLeaderboard() {
+  if (viewingYesterday) {
+    showTodayLeaderboard();
+  } else {
+    if (!yesterdaySnapshot) return;
+    viewingYesterday = true;
+    renderSnapshotLeaderboard(yesterdaySnapshot);
+    document.getElementById('yesterdayBanner').style.display = '';
+    updateYesterdayBtn();
+  }
+}
+
+function showTodayLeaderboard() {
+  viewingYesterday = false;
+  document.getElementById('yesterdayBanner').style.display = 'none';
+  updateYesterdayBtn();
+  autoLoadToken();
+}
+
+function renderSnapshotLeaderboard(snap) {
+  const savedScores = allScoresGlobal;
+  const savedRanks  = globalRanks;
+  const savedTotal  = totalScores;
+  const savedPar    = seededPar;
+
+  seededPar = snap.par;
+  document.getElementById('resultsCount').innerHTML =
+    `<span>${snap.total}</span> players on yesterday's leaderboard`;
+
+  const container = document.getElementById('lbRows');
+  container.innerHTML = snap.scores.map((entry, i) => {
+    const rank        = snap.ranks[i];
+    const rankDisplay = getRankDisplay(rank, snap.scores, i);
+    const rankCls     = getRankClass(rank);
+    const rowCls      = getRowClass(rank);
+    const playerName  = stripDiscTag(entry.playerName);
+    const rawScore    = entry.score !== undefined ? entry.score : 0;
+    const fmt         = formatVsPar(rawScore);
+    return `
+      <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
+        <div class="rank ${rankCls}">${rankDisplay}</div>
+        <div><div class="player-name">${escapeHtml(playerName)}</div></div>
+        <div class="score-cell">
+          <div class="score-vs-par ${fmt.cls}">${fmt.display}</div>
+          <div class="score-raw">${fmt.label}</div>
+        </div>
+        <div class="score-cell">
+          <div class="score-vs-par even" style="font-size:20px">${rawScore}</div>
+          <div class="score-raw">total strokes</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('leaderboardSection').style.display = 'block';
+  document.getElementById('emptyState').style.display = 'none';
+
+  // Restore live state variables (snapshot render is display-only)
+  seededPar       = savedPar;
+  allScoresGlobal = savedScores;
+  globalRanks     = savedRanks;
+  totalScores     = savedTotal;
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  System.Random — .NET Knuth subtractive generator (faithful port)
@@ -693,6 +819,11 @@ function updateCountdown() {
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
+
+  // At exactly 1 second left, snapshot the leaderboard
+  if (h === 0 && m === 0 && s <= 1 && !snapshotTaken && allScoresGlobal.length > 0) {
+    saveSnapshot();
+  }
   const pad = n => String(n).padStart(2, '0');
   const urgent = h === 0 && m < 30;
   ['cdH','cdM','cdS'].forEach(id => document.getElementById(id).classList.toggle('urgent', urgent));
@@ -843,6 +974,9 @@ function renderLeaderboard() {
 
   document.getElementById('resultsCount').innerHTML =
     `<span>${totalScores}</span> players on today's leaderboard`;
+
+  // Show yesterday button if we have a valid snapshot for yesterday
+  updateYesterdayBtn();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -903,6 +1037,17 @@ async function fetchAll(token) {
 //  Auto-load: fetch session token from proxy and kick off everything
 // ═══════════════════════════════════════════════════════════════════
 async function autoLoadToken() {
+  // If the day rolled over since last snapshot, reset the snapshotTaken flag
+  if (snapshotTaken) {
+    const snap = yesterdaySnapshot;
+    if (!snap || snap.dateKey !== getYesterdayDateKey()) {
+      snapshotTaken = false;
+    }
+  }
+  // Reset yesterday-view state when refreshing
+  viewingYesterday = false;
+  document.getElementById('yesterdayBanner').style.display = 'none';
+
   try {
     const r = await fetch(`/api/session`);
     if (!r.ok) throw new Error('Proxy unreachable');
@@ -922,6 +1067,7 @@ async function autoLoadToken() {
   }
 }
 
+loadSnapshotFromStorage();
 autoLoadToken();
 </script>
 </body>
