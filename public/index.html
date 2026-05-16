@@ -568,12 +568,20 @@ function loadSnapshotFromStorage() {
     const raw = localStorage.getItem(YESTERDAY_KEY);
     if (!raw) return;
     const snap = JSON.parse(raw);
-    // Only use it if it's from yesterday relative to now
-    if (snap.dateKey === getYesterdayDateKey()) {
+    // Use it if it's from yesterday (normal case) OR if it's from today
+    // but we're now in a new challenge window (page was open across reset)
+    if (snap.dateKey === getYesterdayDateKey() || snap.dateKey === getTodayDateKey()) {
       yesterdaySnapshot = snap;
     }
   } catch(e) {}
 }
+
+// Save snapshot whenever the user leaves or hides the tab
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && allScoresGlobal.length > 0) {
+    saveSnapshot();
+  }
+});
 
 function updateYesterdayBtn() {
   const btn = document.getElementById('yesterdayBtn');
@@ -631,6 +639,7 @@ async function refreshLeaderboardOnly() {
     globalRanks     = computeTiedRanks(allScoresGlobal);
 
     if (allScoresGlobal.length > 0) {
+      saveSnapshot();
       renderLeaderboard();
       document.getElementById('leaderboardSection').style.display = 'block';
       document.getElementById('emptyState').style.display = 'none';
@@ -1076,6 +1085,10 @@ async function fetchAll(token) {
       document.getElementById('emptyState').style.display = 'block';
       return;
     }
+
+    // Save a snapshot every successful load so yesterday's leaderboard
+    // is available even if the page wasn't open at the exact reset moment
+    saveSnapshot();
 
     renderLeaderboard();
     document.getElementById('leaderboardSection').style.display = 'block';
