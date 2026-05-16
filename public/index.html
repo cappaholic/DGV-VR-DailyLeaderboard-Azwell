@@ -568,9 +568,10 @@ function loadSnapshotFromStorage() {
     const raw = localStorage.getItem(YESTERDAY_KEY);
     if (!raw) return;
     const snap = JSON.parse(raw);
-    // Use it if it's from yesterday (normal case) OR if it's from today
-    // but we're now in a new challenge window (page was open across reset)
-    if (snap.dateKey === getYesterdayDateKey() || snap.dateKey === getTodayDateKey()) {
+    // Only treat the snapshot as "yesterday" if its date key is not the current window.
+    // This covers both the normal case (stored as yesterday) and the case where the
+    // day rolled over and the stored key is now behind the current window's key.
+    if (snap.dateKey !== getTodayDateKey()) {
       yesterdaySnapshot = snap;
     }
   } catch(e) {}
