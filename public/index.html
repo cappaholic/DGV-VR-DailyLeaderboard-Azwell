@@ -7,21 +7,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --green-deep:   #0d2e1a;
-    --green-mid:    #1a4a2a;
-    --green-bright: #2d7a45;
-    --green-neon:   #4ade80;
+    --green-deep:   #0e2318;
+    --green-mid:    #183d28;
+    --green-bright: #2e6e42;
+    --green-neon:   #5dbf7a;
     --gold:         #f0b429;
     --silver:       #b0bec5;
     --bronze:       #cd7f32;
-    --white:        #f0f4f0;
-    --muted:        #6b8f71;
-    --surface:      #112318;
-    --card:         #162d1e;
-    --border:       #2a4a32;
-    --red:          #f87171;
-    --accent2:      #38bdf8;
-    --purple:       #c084fc;
+    --white:        #eef5e8;
+    --muted:        #7aaa8a;
+    --surface:      #0a1c12;
+    --card:         #122b1c;
+    --border:       #234d30;
+    --red:          #e05c5c;
+    --accent2:      #5db8e8;
+    --purple:       #a97dd4;
 
     /* ── Course identity colors ── */
     --course-sunshine:   #F0DF00;   /* Sunshine Glade    – Bright Yellow  */
@@ -59,7 +59,7 @@
   .header-logo {
     display: block; margin: 0 auto 0;
     width: clamp(240px, 50vw, 480px); height: auto;
-    filter: drop-shadow(0 0 18px rgba(74,222,128,0.25));
+    filter: drop-shadow(0 0 18px rgba(93,191,122,0.30));
   }
   .header .subtitle {
     font-family: 'DM Mono', monospace;
@@ -125,8 +125,8 @@
   .seed-badge {
     font-family: 'DM Mono', monospace;
     font-size: 12px; color: var(--accent2);
-    background: rgba(56,189,248,0.08);
-    border: 1px solid rgba(56,189,248,0.25);
+    background: rgba(93,184,232,0.08);
+    border: 1px solid rgba(93,184,232,0.25);
     border-radius: 4px; padding: 2px 10px;
   }
   .layout-par-badge {
@@ -291,7 +291,7 @@
   input:focus { border-color: var(--green-neon); }
   input::placeholder { color: var(--muted); }
   input[type="number"] { text-align: center; font-size: 18px; font-weight: 500; }
-  input[readonly] { color: var(--green-neon); cursor: default; border-color: rgba(74,222,128,0.2); }
+  input[readonly] { color: var(--green-neon); cursor: default; border-color: rgba(93,191,122,0.2); }
 
   .btn {
     background: var(--green-bright); color: var(--white);
@@ -316,9 +316,9 @@
     font-family: 'DM Mono', monospace; font-size: 12px; margin-bottom: 16px;
   }
   .status-bar.show { display: flex; }
-  .status-bar.error   { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.3);  color: #f87171; }
-  .status-bar.loading { background: rgba(74,222,128,0.08); border: 1px solid var(--border);       color: var(--muted); }
-  .status-bar.success { background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.2); color: var(--green-neon); }
+  .status-bar.error   { background: rgba(224,92,92,0.1);  border: 1px solid rgba(224,92,92,0.3);  color: #e05c5c; }
+  .status-bar.loading { background: rgba(93,191,122,0.08); border: 1px solid var(--border);       color: var(--muted); }
+  .status-bar.success { background: rgba(93,191,122,0.08); border: 1px solid rgba(93,191,122,0.2); color: var(--green-neon); }
   .spinner {
     width: 14px; height: 14px;
     border: 2px solid var(--border); border-top-color: var(--green-neon);
@@ -362,12 +362,12 @@
     display: grid;
     grid-template-columns: 64px 1fr 100px 100px;
     padding: 12px 20px;
-    border-bottom: 1px solid rgba(42,74,50,0.5);
+    border-bottom: 1px solid rgba(35,77,48,0.5);
     align-items: center; transition: background 0.15s;
     animation: fadeIn 0.3s ease both;
   }
   .lb-row:last-child { border-bottom: none; }
-  .lb-row:hover { background: rgba(74,222,128,0.04); }
+  .lb-row:hover { background: rgba(93,191,122,0.04); }
   @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   .lb-row.top-1 { background: rgba(240,180,41,0.06); }
   .lb-row.top-2 { background: rgba(176,190,197,0.04); }
@@ -835,7 +835,7 @@ function updateCountdown() {
   const s = Math.floor((diff % 60000) / 1000);
 
   const pad = n => String(n).padStart(2, '0');
-  const urgent = h === 0 && m < 30;
+  const urgent = h === 0 && m < 10;
   ['cdH','cdM','cdS'].forEach(id => document.getElementById(id).classList.toggle('urgent', urgent));
   document.getElementById('cdH').textContent = pad(h);
   document.getElementById('cdM').textContent = pad(m);
