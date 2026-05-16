@@ -584,17 +584,24 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+function snapshotMatchesToday() {
+  if (!yesterdaySnapshot) return false;
+  if (yesterdaySnapshot.total !== totalScores) return false;
+  const snapNames = yesterdaySnapshot.scores.map(s => s.playerName).join(',');
+  const todayNames = allScoresGlobal.map(s => s.playerName).join(',');
+  return snapNames === todayNames;
+}
+
 function updateYesterdayBtn() {
   const btn = document.getElementById('yesterdayBtn');
   if (!btn) return;
-  if (yesterdaySnapshot) {
+  if (yesterdaySnapshot && !snapshotMatchesToday()) {
     btn.style.display = '';
     btn.textContent = viewingYesterday ? "Today's Leaderboard" : "Yesterday's Leaderboard";
   } else {
     btn.style.display = 'none';
   }
 }
-
 function toggleYesterdayLeaderboard() {
   if (viewingYesterday) {
     showTodayLeaderboard();
