@@ -477,10 +477,13 @@
     <div class="controls-row">
       <div class="results-count" id="resultsCount"></div>
       <div style="display:flex;gap:8px;align-items:center">
+        <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
         <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
       </div>
     </div>
-    <div class="leaderboard">
+    <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(240,180,41,0.2);">
+      📅 Viewing Yesterday's Leaderboard
+    </div>    <div class="leaderboard">
       <div class="lb-header">
         <span>Rank</span>
         <span>Player</span>
@@ -524,9 +527,102 @@ let totalScores     = 0;
 let accessToken     = null;
 let seededPar       = null;
 
+// ── Yesterday's leaderboard ──
+let yesterdaySnapshot = null;  // loaded from yesterday.json committed by GitHub Actions
+let viewingYesterday  = false;
+
+async function loadYesterdaySnapshot() {
+  try {
+    const res = await fetch('yesterday.json?_=' + Date.now()); // cache-bust
+    if (!res.ok) return; // file doesn't exist yet, that's fine
+    const snap = await res.json();
+    if (snap && snap.scores && snap.scores.length > 0) {
+      yesterdaySnapshot = snap;
+      updateYesterdayBtn();
+    }
+  } catch(e) {
+    // No snapshot available, yesterday button stays hidden
+  }
+}
+
+function updateYesterdayBtn() {
+  const btn = document.getElementById('yesterdayBtn');
+  if (!btn) return;
+  if (yesterdaySnapshot) {
+    btn.style.display = '';
+    btn.textContent = viewingYesterday ? "Today's Leaderboard" : "Yesterday's Leaderboard";
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function toggleYesterdayLeaderboard() {
+  if (viewingYesterday) {
+    showTodayLeaderboard();
+  } else {
+    if (!yesterdaySnapshot) return;
+    viewingYesterday = true;
+    renderSnapshotLeaderboard(yesterdaySnapshot);
+    document.getElementById('yesterdayBanner').style.display = '';
+    updateYesterdayBtn();
+  }
+}
+
+function showTodayLeaderboard() {
+  viewingYesterday = false;
+  document.getElementById('yesterdayBanner').style.display = 'none';
+  updateYesterdayBtn();
+  autoLoadToken();
+}
+
+function renderSnapshotLeaderboard(snap) {
+  const savedScores = allScoresGlobal;
+  const savedRanks  = globalRanks;
+  const savedTotal  = totalScores;
+  const savedPar    = seededPar;
+
+  document.getElementById('resultsCount').innerHTML =
+    `<span>${snap.total}</span> players on yesterday's leaderboard`;
+
+  const container = document.getElementById('lbRows');
+  container.innerHTML = snap.scores.map((entry, i) => {
+    const rank        = snap.ranks[i];
+    const rankDisplay = getRankDisplay(rank, snap.scores, i);
+    const rankCls     = getRankClass(rank);
+    const rowCls      = getRowClass(rank);
+    const playerName  = stripDiscTag(entry.playerName);
+    const rawScore    = entry.score !== undefined ? entry.score : 0;
+    const fmt         = formatVsPar(rawScore);
+    return `
+      <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
+        <div class="rank ${rankCls}">${rankDisplay}</div>
+        <div><div class="player-name">${escapeHtml(playerName)}</div></div>
+        <div class="score-cell">
+          <div class="score-vs-par ${fmt.cls}">${fmt.display}</div>
+          <div class="score-raw">${fmt.label}</div>
+        </div>
+        <div class="score-cell">
+          <div class="score-vs-par even" style="font-size:20px">${rawScore}</div>
+          <div class="score-raw">total strokes</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('leaderboardSection').style.display = 'block';
+  document.getElementById('emptyState').style.display = 'none';
+
+  // Restore live state variables (snapshot render is display-only)
+  seededPar       = savedPar;
+  allScoresGlobal = savedScores;
+  globalRanks     = savedRanks;
+  totalScores     = savedTotal;
+}
+
 // Refresh only the leaderboard rows without hiding the section or jumping the page
 async function refreshLeaderboardOnly() {
   if (!accessToken) { autoLoadToken(); return; }
+  if (viewingYesterday) { showTodayLeaderboard(); return; }
 
   const btn = document.getElementById('refreshBtn');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
@@ -976,6 +1072,7 @@ async function autoLoadToken() {
 }
 
 autoLoadToken();
+loadYesterdaySnapshot();
 </script>
 </body>
 </html>
