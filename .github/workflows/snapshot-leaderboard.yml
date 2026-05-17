@@ -2,8 +2,8 @@ name: Snapshot Daily Leaderboard
 
 on:
   schedule:
-    # Runs at 00:55 UTC — 5 minutes before 01:00 UTC reset (7:55 PM EST)
-    - cron: '55 0 * * *'
+    # Runs at 23:55 UTC — 5 minutes before midnight UTC reset (7:55 PM EDT / 8 PM EST in winter)
+    - cron: '55 23 * * *'
   workflow_dispatch: # Allow manual trigger from GitHub Actions tab
 
 jobs:
