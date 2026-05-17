@@ -514,7 +514,7 @@ const PROXY          = '';
 //  CET = UTC+1  →  reset at 19:00 UTC  (RESET_HOUR_UTC = 19)
 //  CEST= UTC+2  →  reset at 18:00 UTC  (RESET_HOUR_UTC = 18)
 //  If the reset time ever drifts (e.g. seasonal DST), update this one value.
-const RESET_HOUR_UTC = 0;
+const RESET_HOUR_UTC = 1;
 
 let allScoresGlobal = [];
 let globalRanks     = [];
@@ -569,7 +569,12 @@ function showTodayLeaderboard() {
   viewingYesterday = false;
   document.getElementById('yesterdayBanner').style.display = 'none';
   updateYesterdayBtn();
-  autoLoadToken();
+  // Use cached token if available — avoids a full page re-auth and layout re-render
+  if (accessToken) {
+    fetchScoresOnly(accessToken);
+  } else {
+    autoLoadToken();
+  }
 }
 
 function renderSnapshotLeaderboard(snap) {
@@ -994,6 +999,44 @@ function renderLeaderboard() {
 // ═══════════════════════════════════════════════════════════════════
 //  Main fetch flow
 // ═══════════════════════════════════════════════════════════════════
+// Refreshes only the leaderboard rows — skips re-auth and layout re-render.
+// Used when returning from yesterday's view since we already have a valid token.
+async function fetchScoresOnly(token) {
+  try {
+    const first = await fetchScoresPage(token, 0, 100);
+    totalScores = first.total || (first.results || []).length;
+    const pages = [first.results || []];
+
+    if (totalScores > 100) {
+      const fetches = [];
+      for (let offset = 100; offset < totalScores; offset += 100) {
+        fetches.push(fetchScoresPage(token, offset, 100));
+      }
+      const rest = await Promise.all(fetches);
+      rest.forEach(r => pages.push(r.results || []));
+    }
+
+    allScoresGlobal = pages.flat();
+    globalRanks     = computeTiedRanks(allScoresGlobal);
+
+    if (allScoresGlobal.length === 0) {
+      document.getElementById('emptyStateMsg').textContent = 'No scores found for today\'s challenge yet.';
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('leaderboardSection').style.display = 'none';
+      document.getElementById('emptyState').style.display = 'block';
+      return;
+    }
+
+    renderLeaderboard();
+    document.getElementById('leaderboardSection').style.display = 'block';
+
+  } catch (err) {
+    // Token may have expired — fall back to full re-auth
+    console.warn('[DGVR] fetchScoresOnly failed, falling back to full reload:', err.message);
+    autoLoadToken();
+  }
+}
+
 async function fetchAll(token) {
   document.getElementById('leaderboardSection').style.display = 'none';
   document.getElementById('emptyState').style.display = 'none';
