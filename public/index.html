@@ -334,7 +334,9 @@
     margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
   }
   @media (max-width: 600px) {
-    .controls-row { flex-direction: column; align-items: flex-start; }
+    .controls-row { flex-wrap: wrap; }
+    .controls-row > div { margin-left: auto; }
+    .refresh-btn { white-space: nowrap; }
   }
   .results-count { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
   .results-count span { color: var(--accent2); }
