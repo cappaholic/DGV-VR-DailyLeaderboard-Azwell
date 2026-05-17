@@ -2,7 +2,7 @@ name: Snapshot Daily Leaderboard
 
 on:
   schedule:
-    # Runs at 23:55 UTC — 5 minutes before midnight reset
+    # Runs at 23:55 UTC — 5 minutes before midnight UTC reset (7:55 PM EDT)
     - cron: '55 23 * * *'
   workflow_dispatch: # Allow manual trigger from GitHub Actions tab
 
@@ -90,7 +90,8 @@ jobs:
             "total":  total
           }
 
-          with open("yesterday.json", "w") as f:
+          # ── Save to public/ so Vercel serves it at /yesterday.json ──
+          with open("public/yesterday.json", "w") as f:
             json.dump(snapshot, f)
 
           print(f"Snapshot saved with {len(all_results)} entries.")
@@ -100,6 +101,6 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add yesterday.json
+          git add public/yesterday.json
           git diff --staged --quiet || git commit -m "chore: daily leaderboard snapshot [skip ci]"
           git push
