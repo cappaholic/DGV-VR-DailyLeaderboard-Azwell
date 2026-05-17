@@ -479,10 +479,10 @@
   <!-- ── Leaderboard section ── -->
   <div id="leaderboardSection" style="display:none">
     <div class="leaderboard">
-      <div style="padding:12px 20px 0; box-sizing:border-box; width:100%;">
-        <div class="controls-row">
+      <div style="padding:12px 20px 0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--border);">
           <div class="results-count" id="resultsCount"></div>
-          <div style="display:flex;gap:8px;align-items:center;min-width:0;flex-shrink:1;">
+          <div style="display:flex;gap:8px;align-items:center;margin-left:auto;">
             <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
             <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
           </div>
