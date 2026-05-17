@@ -523,20 +523,22 @@ let accessToken     = null;
 let seededPar       = null;
 
 // ── Yesterday's leaderboard ──
-let yesterdaySnapshot = null;  // loaded from yesterday.json committed by GitHub Actions
+// Snapshot is fetched from /yesterday.json, which is written to public/
+// by the GitHub Actions workflow at 23:55 UTC daily and auto-deployed by Vercel.
+let yesterdaySnapshot = null;
 let viewingYesterday  = false;
 
 async function loadYesterdaySnapshot() {
   try {
     const res = await fetch('yesterday.json?_=' + Date.now()); // cache-bust
-    if (!res.ok) return; // file doesn't exist yet, that's fine
+    if (!res.ok) return; // file doesn't exist yet — that's fine
     const snap = await res.json();
     if (snap && snap.scores && snap.scores.length > 0) {
       yesterdaySnapshot = snap;
       updateYesterdayBtn();
     }
   } catch(e) {
-    // No snapshot available, yesterday button stays hidden
+    // No snapshot available yet, yesterday button stays hidden
   }
 }
 
@@ -1047,6 +1049,11 @@ async function fetchAll(token) {
 //  Auto-load: fetch session token from proxy and kick off everything
 // ═══════════════════════════════════════════════════════════════════
 async function autoLoadToken() {
+  // Reset to today's view whenever refresh is triggered
+  viewingYesterday = false;
+  const banner = document.getElementById('yesterdayBanner');
+  if (banner) banner.style.display = 'none';
+  updateYesterdayBtn();
   try {
     const r = await fetch(`/api/session`);
     if (!r.ok) throw new Error('Proxy unreachable');
@@ -1066,8 +1073,8 @@ async function autoLoadToken() {
   }
 }
 
-autoLoadToken();
 loadYesterdaySnapshot();
+autoLoadToken();
 </script>
 </body>
 </html>
