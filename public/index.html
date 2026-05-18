@@ -388,6 +388,27 @@
   .lb-row.top-1 { background: rgba(240,180,41,0.06); }
   .lb-row.top-2 { background: rgba(176,190,197,0.04); }
   .lb-row.top-3 { background: rgba(205,127,50,0.04); }
+  .lb-row.cheater {
+    background: rgba(180,30,30,0.18) !important;
+    position: relative;
+    overflow: hidden;
+  }
+  .lb-row.cheater:hover { background: rgba(180,30,30,0.24) !important; }
+  .lb-row.cheater .rank,
+  .lb-row.cheater .player-name,
+  .lb-row.cheater .score-vs-par,
+  .lb-row.cheater .score-raw { color: #6b6b6b !important; text-shadow: none !important; }
+  .cheater-stamp {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px;
+    max-width: 70%;
+    opacity: 0.82;
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+  }
 
   .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); text-align: center; }
   .rank.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
@@ -536,6 +557,27 @@ let totalScores     = 0;
 let accessToken     = null;
 let seededPar       = null;
 
+// ── Flagged players (known cheaters) ───────────────────────────────
+// Edit public/flagged.json in your repo to add/remove names.
+// Names are case-insensitive and matched after stripping the #tag.
+let flaggedPlayers = new Set();
+
+async function loadFlaggedPlayers() {
+  try {
+    const res = await fetch('flagged.json?_=' + Date.now());
+    if (!res.ok) return;
+    const data = await res.json();
+    flaggedPlayers = new Set((data.players || []).map(n => n.toLowerCase()));
+    console.log('[DGVR] Flagged players loaded:', flaggedPlayers.size);
+  } catch(e) {
+    // No flagged.json yet — that's fine
+  }
+}
+
+function isFlagged(playerName) {
+  return flaggedPlayers.has(playerName.toLowerCase());
+}
+
 // ── Yesterday's leaderboard ──
 // Snapshot is fetched from /yesterday.json, which is written to public/
 // by the GitHub Actions workflow at 23:55 UTC daily and auto-deployed by Vercel.
@@ -605,16 +647,19 @@ function renderSnapshotLeaderboard(snap) {
     const rank        = snap.ranks[i];
     const rankDisplay = getRankDisplay(rank, snap.scores, i);
     const rankCls     = getRankClass(rank);
-    const rowCls      = getRowClass(rank);
     const playerName  = stripDiscTag(entry.playerName);
+    const flagged     = isFlagged(playerName);
+    const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
+    const stamp       = flagged ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">` : '';
     return `
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
-        <div class="rank ${rankCls}">${rankDisplay}</div>
+        ${stamp}
+        <div class="rank ${flagged ? '' : rankCls}">${rankDisplay}</div>
         <div><div class="player-name">${escapeHtml(playerName)}</div></div>
         <div class="score-cell">
-          <div class="score-vs-par ${fmt.cls}">${fmt.display}</div>
+          <div class="score-vs-par ${flagged ? 'even' : fmt.cls}">${fmt.display}</div>
           <div class="score-raw">${fmt.label}</div>
         </div>
         <div class="score-cell">
@@ -984,18 +1029,21 @@ function renderLeaderboard() {
     const rank        = globalRanks[i];
     const rankDisplay = getRankDisplay(rank, allScoresGlobal, i);
     const rankCls     = getRankClass(rank);
-    const rowCls      = getRowClass(rank);
     const playerName  = stripDiscTag(entry.playerName);
+    const flagged     = isFlagged(playerName);
+    const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
+    const stamp       = flagged ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">` : '';
     return `
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
-        <div class="rank ${rankCls}">${rankDisplay}</div>
+        ${stamp}
+        <div class="rank ${flagged ? '' : rankCls}">${rankDisplay}</div>
         <div>
           <div class="player-name">${escapeHtml(playerName)}</div>
         </div>
         <div class="score-cell">
-          <div class="score-vs-par ${fmt.cls}">${fmt.display}</div>
+          <div class="score-vs-par ${flagged ? 'even' : fmt.cls}">${fmt.display}</div>
           <div class="score-raw">${fmt.label}</div>
         </div>
         <div class="score-cell">
@@ -1136,6 +1184,7 @@ async function autoLoadToken() {
   }
 }
 
+loadFlaggedPlayers();
 loadYesterdaySnapshot();
 autoLoadToken();
 </script>
