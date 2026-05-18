@@ -485,7 +485,7 @@
       </div>
     </div>
     <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(240,180,41,0.2);">
-      📅 Viewing Yesterday's Leaderboard
+      Viewing Yesterday's Leaderboard
     </div>
     <div class="leaderboard">
       <div class="lb-header">
@@ -591,6 +591,8 @@ function renderSnapshotLeaderboard(snap) {
   const savedRanks  = globalRanks;
   const savedTotal  = totalScores;
   const savedPar    = seededPar;
+  // Use yesterday's par if stored in snapshot, otherwise fall back to today's
+  if (snap.par) seededPar = snap.par;
 
   document.getElementById('resultsCount').innerHTML =
     `<span>${snap.total}</span> players on yesterday's leaderboard`;
@@ -1081,14 +1083,21 @@ async function fetchAll(token) {
     allScoresGlobal = pages.flat();
     globalRanks     = computeTiedRanks(allScoresGlobal);
 
+    // Always show the controls (buttons) section
+    document.getElementById('leaderboardSection').style.display = 'block';
+    updateYesterdayBtn();
+
     if (allScoresGlobal.length === 0) {
-      document.getElementById('emptyStateMsg').textContent = 'No scores found for today\'s challenge yet.';
+      // Show empty message below the buttons but keep buttons accessible
+      document.getElementById('lbRows').innerHTML = '';
+      document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today's leaderboard';
       document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyStateMsg').textContent = 'No scores yet — check back soon!';
       return;
     }
 
+    document.getElementById('emptyState').style.display = 'none';
     renderLeaderboard();
-    document.getElementById('leaderboardSection').style.display = 'block';
 
   } catch (err) {
     document.getElementById('emptyStateMsg').textContent = 'Could not load leaderboard. Please try again later.';
