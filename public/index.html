@@ -331,7 +331,12 @@
   /* ── Leaderboard ── */
   .controls-row {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px; flex-wrap: nowrap; gap: 10px;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
+  }
+  @media (max-width: 600px) {
+    .controls-row .results-count { width: 100%; }
+    .controls-row > div { width: 100%; justify-content: space-between; }
+    .refresh-btn { white-space: nowrap; }
   }
   @media (max-width: 600px) {
     .controls-row { flex-wrap: wrap; }
@@ -591,8 +596,6 @@ function renderSnapshotLeaderboard(snap) {
   const savedRanks  = globalRanks;
   const savedTotal  = totalScores;
   const savedPar    = seededPar;
-  // Use yesterday's par if stored in snapshot, otherwise fall back to today's
-  if (snap.par) seededPar = snap.par;
 
   document.getElementById('resultsCount').innerHTML =
     `<span>${snap.total}</span> players on yesterday's leaderboard`;
@@ -1083,14 +1086,13 @@ async function fetchAll(token) {
     allScoresGlobal = pages.flat();
     globalRanks     = computeTiedRanks(allScoresGlobal);
 
-    // Always show the controls (buttons) section
+    // Always show the controls/buttons
     document.getElementById('leaderboardSection').style.display = 'block';
     updateYesterdayBtn();
 
     if (allScoresGlobal.length === 0) {
-      // Show empty message below the buttons but keep buttons accessible
       document.getElementById('lbRows').innerHTML = '';
-      document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today's leaderboard';
+      document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
       document.getElementById('emptyState').style.display = 'block';
       document.getElementById('emptyStateMsg').textContent = 'No scores yet — check back soon!';
       return;
