@@ -446,6 +446,10 @@
     font-family: 'DM Mono', monospace; font-size: 10px;
     color: var(--muted); letter-spacing: 1px; opacity: 0.5;
   }
+  @media (max-width: 600px) {
+    .footer { display: flex; flex-direction: column; gap: 6px; }
+    .footer .footer-sep { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -533,7 +537,7 @@
   </div>
 
   <div class="footer">
-    Original Leaderboard by DSallee &nbsp;·&nbsp; New Design and Functionality by Azwell &nbsp;·&nbsp; Code Provided by Claude AI
+    <span>Original Leaderboard by DSallee</span><span class="footer-sep"> &nbsp;·&nbsp; </span><span>New Design and Functionality by Azwell</span><span class="footer-sep"> &nbsp;·&nbsp; </span><span>Code Provided by Claude AI</span>
   </div>
 </div>
 
@@ -685,8 +689,8 @@ function renderSnapshotLeaderboard(snap) {
 
 // Refresh only the leaderboard rows without hiding the section or jumping the page
 async function refreshLeaderboardOnly() {
-  if (!accessToken) { autoLoadToken(); return; }
   if (viewingYesterday) { showTodayLeaderboard(); return; }
+  if (!accessToken) { autoLoadToken(); return; }
 
   const btn = document.getElementById('refreshBtn');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
