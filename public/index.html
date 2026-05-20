@@ -468,8 +468,15 @@
     <div class="subtitle">
       <svg viewBox="0 0 560 42" width="100%" style="max-width:480px;margin-top:24px;margin-bottom:-8px;" xmlns="http://www.w3.org/2000/svg" role="img"><title>Daily Challenge Leaderboard</title>
         <defs>
-          <filter id="dshadow" x="-5%" y="-5%" width="110%" height="130%">
+          <filter id="txtfx" x="-8%" y="-15%" width="116%" height="140%">
             <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.5"/>
+            <feComposite in="SourceGraphic" operator="over"/>
+          </filter>
+          <filter id="glow" x="-8%" y="-15%" width="116%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feFlood flood-color="#4ab8e8" flood-opacity="0.3" result="color"/>
+            <feComposite in="color" in2="blur" operator="in" result="glow"/>
+            <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
         <text x="280" y="31"
@@ -479,11 +486,11 @@
           font-weight="400"
           fill="#eaeaea"
           stroke="#0a1520"
-          stroke-width="3.5"
+          stroke-width="2.5"
           stroke-linejoin="round"
           paint-order="stroke fill"
           letter-spacing="5"
-          filter="url(#dshadow)"
+          filter="url(#glow)"
         >DAILY CHALLENGE LEADERBOARD</text>
       </svg>
     </div>
