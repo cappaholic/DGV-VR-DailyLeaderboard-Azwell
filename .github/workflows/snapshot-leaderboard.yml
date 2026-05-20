@@ -54,7 +54,7 @@ jobs:
           TOTAL=$(echo "$FIRST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('total', len(d.get('results',[]))))")
           echo "Total scores: $TOTAL"
 
-          # Fetch remaining pages, compute par, and save snapshot
+          # Fetch remaining pages if needed and merge all results
           python3 << EOF
           import json, urllib.request, math
 
@@ -76,83 +76,7 @@ jobs:
               data = json.loads(r.read())
               all_results.extend(data.get("results", []))
 
-          # ── Fetch daily seed and compute par ─────────────────────────
-          COURSES = [
-            {"name": "Sunshine Glade",    "holes": [3,3,3,3,4]},
-            {"name": "Blueberry Thicket", "holes": [3,3,4,3,3,3,3,3,3]},
-            {"name": "Oak Hill",          "holes": [4,3,4,4,4,4,4,4,3]},
-            {"name": "Lakeside",          "holes": [3,4,3,5,4,3,3,3,5]},
-            {"name": "Windswept Fields",  "holes": [3,4,4,3,4,3,3,3,3]},
-            {"name": "Harrowing Woods",   "holes": [3,3,3,3,4,4,3,4,5]},
-            {"name": "The Crows Nest",    "holes": [3,3,4,4,3,3,4,3,4]},
-            {"name": "Grizzly Gulch",     "holes": [3,3,4,3,4,4,3,4,3]},
-          ]
-
-          def system_random(seed):
-            MBIG = 2147483647
-            sa = [0] * 56
-            mj = 161803398 - abs(seed)
-            if mj < 0: mj += MBIG
-            sa[55] = mj
-            mk = 1
-            for i in range(1, 55):
-              ii = (21 * i) % 55
-              sa[ii] = mk
-              mk = mj - mk
-              if mk < 0: mk += MBIG
-              mj = sa[ii]
-            for k in range(1, 5):
-              for i in range(1, 56):
-                n = i + 30
-                if n >= 55: n -= 55
-                sa[i] -= sa[1 + n]
-                if sa[i] < 0: sa[i] += MBIG
-            state = {"sa": sa, "inext": 0, "inextp": 21}
-            def sample():
-              li = state["inext"] + 1
-              lp = state["inextp"] + 1
-              if li >= 56: li = 1
-              if lp >= 56: lp = 1
-              v = state["sa"][li] - state["sa"][lp]
-              if v == MBIG: v -= 1
-              if v < 0: v += MBIG
-              state["sa"][li] = v
-              state["inext"] = li
-              state["inextp"] = lp
-              return v
-            def next_range(mn, mx):
-              r = mx - mn
-              if r <= 1: return mn
-              return mn + int((sample() / 2147483647.0) * r)
-            return sample, next_range
-
-          total_par = None
-          try:
-            seed_url = f"{vercel_url}/api/cloudsave/v1/data/projects/{project_id}/custom/dailySeed/items"
-            req = urllib.request.Request(seed_url, headers={"Authorization": f"Bearer {access_token}"})
-            with urllib.request.urlopen(req) as r:
-              seed_data = json.loads(r.read())
-              seed_entry = next((x for x in seed_data.get("results", []) if x["key"] == "seed"), None)
-              if seed_entry:
-                seed_value = int(seed_entry["value"])
-                sample, next_range = system_random(seed_value)
-                pool = list(range(len(COURSES)))
-                selected = []
-                for i in range(3):
-                  idx = next_range(0, len(pool))
-                  selected.append(pool[idx])
-                  pool.pop(idx)
-                total_par = 0
-                for ci in selected:
-                  course = COURSES[ci]
-                  keyed = [(course["holes"][j], sample()) for j in range(len(course["holes"]))]
-                  keyed.sort(key=lambda x: x[1])
-                  total_par += sum(h[0] for h in keyed[:3])
-                print(f"Computed par: {total_par}")
-          except Exception as e:
-            print(f"Par computation failed: {e}")
-
-          # ── Compute tied ranks ────────────────────────────────────────
+          # Compute tied ranks
           ranks = []
           for i, entry in enumerate(all_results):
             if i > 0 and entry["score"] == all_results[i-1]["score"]:
@@ -164,14 +88,14 @@ jobs:
             "scores": all_results,
             "ranks":  ranks,
             "total":  total,
-            "par":    total_par
+            "seed":   seed_value
           }
 
           # ── Save to public/ so Vercel serves it at /yesterday.json ──
           with open("public/yesterday.json", "w") as f:
             json.dump(snapshot, f)
 
-          print(f"Snapshot saved with {len(all_results)} entries, par={total_par}.")
+          print(f"Snapshot saved with {len(all_results)} entries.")
           EOF
 
       - name: Commit snapshot to repo
