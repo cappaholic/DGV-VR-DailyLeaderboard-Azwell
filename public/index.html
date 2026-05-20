@@ -331,7 +331,7 @@
 
   /* ── Leaderboard ── */
   .controls-row {
-    display: flex; align-items: flex-start; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
   }
   @media (max-width: 600px) {
@@ -513,10 +513,12 @@
   <div id="leaderboardSection" style="display:none">
     <div class="controls-row">
       <div class="results-count" id="resultsCount"></div>
-      <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;">
+      <div id="todayViewBtns" style="display:flex;gap:8px;align-items:center;">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
-        <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()" style="display:none">Today's Leaderboard</button>
         <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
+      </div>
+      <div id="yesterdayViewBtns" style="display:none;">
+        <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()" style="width:100%;">Today's Leaderboard</button>
       </div>
     </div>
     <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(240,180,41,0.2);">
@@ -610,21 +612,23 @@ async function loadYesterdaySnapshot() {
 }
 
 function updateYesterdayBtn() {
-  const yesterdayBtn = document.getElementById('yesterdayBtn');
-  const todayBtn     = document.getElementById('todayBtnRightBtn');
-  const refreshBtn   = document.getElementById('refreshBtn');
+  const yesterdayBtn      = document.getElementById('yesterdayBtn');
+  const todayViewBtns     = document.getElementById('todayViewBtns');
+  const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
   if (!yesterdayBtn) return;
 
   if (viewingYesterday) {
-    // Viewing yesterday: show Today's Leaderboard, hide Yesterday + Refresh
-    yesterdayBtn.style.display = 'none';
-    todayBtn.style.display     = '';
-    refreshBtn.style.display   = 'none';
+    // Capture today row width before hiding, apply to yesterday container
+    const w = todayViewBtns.offsetWidth;
+    todayViewBtns.style.display     = 'none';
+    yesterdayViewBtns.style.display = '';
+    if (w > 0) yesterdayViewBtns.style.width = w + 'px';
   } else {
-    // Viewing today: show Yesterday (if available) + Refresh, hide Today btn
-    todayBtn.style.display     = 'none';
-    refreshBtn.style.display   = '';
-    yesterdayBtn.style.display = yesterdaySnapshot ? '' : 'none';
+    // Today view: show normal row, hide yesterday view button
+    yesterdayViewBtns.style.display = 'none';
+    yesterdayViewBtns.style.width   = '';
+    todayViewBtns.style.display     = '';
+    yesterdayBtn.style.display      = yesterdaySnapshot ? '' : 'none';
   }
 }
 
