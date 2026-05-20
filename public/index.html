@@ -517,7 +517,7 @@
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
         <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;" id="todayBtnRight" style="display:none">
+      <div id="todayBtnRight" style="display:none;gap:8px;align-items:center;">
         <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()">Today's Leaderboard</button>
       </div>
     </div>
@@ -1126,10 +1126,12 @@ async function fetchScoresOnly(token) {
     globalRanks     = computeTiedRanks(allScoresGlobal);
 
     if (allScoresGlobal.length === 0) {
-      document.getElementById('emptyStateMsg').textContent = 'No scores found for today\'s challenge yet.';
-      document.getElementById('emptyState').style.display = 'none';
-      document.getElementById('leaderboardSection').style.display = 'none';
+      document.getElementById('lbRows').innerHTML = '';
+      document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
       document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyStateMsg').textContent = 'No scores yet — check back soon!';
+      document.getElementById('leaderboardSection').style.display = 'block';
+      updateYesterdayBtn();
       return;
     }
 
