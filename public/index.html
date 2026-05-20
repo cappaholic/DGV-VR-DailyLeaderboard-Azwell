@@ -110,6 +110,7 @@
     display: none;
   }
   .layout-strip.show { display: block; }
+  .layout-strip.yesterday-mode { border-top-color: #b44040; }
 
   .layout-top-row {
     display: flex;
@@ -516,6 +517,9 @@
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
         <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
       </div>
+      <div style="display:flex;gap:8px;align-items:center;" id="todayBtnRight" style="display:none">
+        <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()">Today's Leaderboard</button>
+      </div>
     </div>
     <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(240,180,41,0.2);">
       Viewing Yesterday's Leaderboard
@@ -563,6 +567,8 @@ let globalRanks     = [];
 let totalScores     = 0;
 let accessToken     = null;
 let seededPar       = null;
+let todaySeed       = null;
+let todayLayout     = null;
 
 // ── Flagged players (known cheaters) ───────────────────────────────
 // Edit public/flagged.json in your repo to add/remove names.
@@ -606,13 +612,26 @@ async function loadYesterdaySnapshot() {
 }
 
 function updateYesterdayBtn() {
-  const btn = document.getElementById('yesterdayBtn');
+  const btn        = document.getElementById('yesterdayBtn');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const todayRight = document.getElementById('todayBtnRight');
   if (!btn) return;
-  if (yesterdaySnapshot) {
-    btn.style.display = '';
-    btn.textContent = viewingYesterday ? "Today's Leaderboard" : "Yesterday's Leaderboard";
+
+  if (viewingYesterday) {
+    // Viewing yesterday: hide left-side buttons, show today btn on the right
+    btn.style.display        = 'none';
+    refreshBtn.style.display = 'none';
+    todayRight.style.display = '';
   } else {
-    btn.style.display = 'none';
+    // Viewing today: show normal buttons, hide right-side today btn
+    todayRight.style.display = 'none';
+    refreshBtn.style.display = '';
+    if (yesterdaySnapshot) {
+      btn.style.display  = '';
+      btn.textContent    = "Yesterday's Leaderboard";
+    } else {
+      btn.style.display  = 'none';
+    }
   }
 }
 
@@ -624,6 +643,16 @@ function toggleYesterdayLeaderboard() {
     viewingYesterday = true;
     renderSnapshotLeaderboard(yesterdaySnapshot);
     document.getElementById('yesterdayBanner').style.display = '';
+    // Switch layout labels and border color to yesterday mode
+    document.querySelector('#layoutStrip .layout-section-label').textContent = "Yesterday's Layout";
+    document.querySelector('#scorecardSection .layout-section-label').textContent = "Yesterday's Par";
+    document.getElementById('layoutStrip').classList.add('yesterday-mode');
+    document.getElementById('scorecardSection').classList.add('yesterday-mode');
+    // Render yesterday's layout if snapshot contains seed
+    if (yesterdaySnapshot.seed) {
+      const yLayout = generateLayout(yesterdaySnapshot.seed);
+      renderLayout(yesterdaySnapshot.seed, yLayout);
+    }
     updateYesterdayBtn();
   }
 }
@@ -631,8 +660,16 @@ function toggleYesterdayLeaderboard() {
 function showTodayLeaderboard() {
   viewingYesterday = false;
   document.getElementById('yesterdayBanner').style.display = 'none';
+  // Restore layout labels and border color
+  document.querySelector('#layoutStrip .layout-section-label').textContent = "Today's Layout";
+  document.querySelector('#scorecardSection .layout-section-label').textContent = "Today's Par";
+  document.getElementById('layoutStrip').classList.remove('yesterday-mode');
+  document.getElementById('scorecardSection').classList.remove('yesterday-mode');
+  // Restore today's layout
+  if (seededPar && todaySeed && todayLayout) {
+    renderLayout(todaySeed, todayLayout);
+  }
   updateYesterdayBtn();
-  // Use cached token if available — avoids a full page re-auth and layout re-render
   if (accessToken) {
     fetchScoresOnly(accessToken);
   } else {
@@ -1119,7 +1156,9 @@ async function fetchAll(token) {
       const seed   = await fetchDailySeed(accessToken);
       const layout = generateLayout(seed);
       renderLayout(seed, layout);
-      seededPar = layout.totalPar;
+      seededPar   = layout.totalPar;
+      todaySeed   = seed;
+      todayLayout = layout;
     } catch(seedErr) {
       console.warn('Seed fetch failed:', seedErr.message);
     }
