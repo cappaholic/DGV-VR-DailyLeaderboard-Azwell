@@ -466,18 +466,24 @@
   <div class="header">
     <img src="DGVR_Logo.png" alt="Disc Golf Valley VR" class="header-logo"/>
     <div class="subtitle">
-      <svg viewBox="0 0 560 40" width="100%" style="max-width:480px;margin-top:24px;" xmlns="http://www.w3.org/2000/svg" role="img"><title>Daily Challenge Leaderboard</title>
+      <svg viewBox="0 0 560 42" width="100%" style="max-width:480px;margin-top:24px;margin-bottom:-8px;" xmlns="http://www.w3.org/2000/svg" role="img"><title>Daily Challenge Leaderboard</title>
+        <defs>
+          <filter id="dshadow" x="-5%" y="-5%" width="110%" height="130%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.5"/>
+          </filter>
+        </defs>
         <text x="280" y="31"
           text-anchor="middle"
           font-family="'Bebas Neue', Impact, sans-serif"
           font-size="32"
           font-weight="400"
-          fill="#e0e0e0"
+          fill="#eaeaea"
           stroke="#0a1520"
           stroke-width="3.5"
           stroke-linejoin="round"
           paint-order="stroke fill"
           letter-spacing="5"
+          filter="url(#dshadow)"
         >DAILY CHALLENGE LEADERBOARD</text>
       </svg>
     </div>
