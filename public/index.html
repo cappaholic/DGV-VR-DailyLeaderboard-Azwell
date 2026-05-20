@@ -336,8 +336,8 @@
   }
   @media (max-width: 600px) {
     .controls-row .results-count { width: 100%; }
-    .controls-row > div { width: 100%; justify-content: space-between; }
-    .refresh-btn { white-space: nowrap; }
+    .controls-row > div { width: 100%; }
+    .refresh-btn { white-space: nowrap; text-align: center; }
   }
   @media (max-width: 600px) {
     .controls-row { flex-wrap: wrap; }
@@ -513,12 +513,10 @@
   <div id="leaderboardSection" style="display:none">
     <div class="controls-row">
       <div class="results-count" id="resultsCount"></div>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
+        <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()" style="display:none">Today's Leaderboard</button>
         <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
-      </div>
-      <div id="todayBtnRight" style="display:none;gap:8px;align-items:center;">
-        <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()">Today's Leaderboard</button>
       </div>
     </div>
     <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(240,180,41,0.2);">
@@ -612,26 +610,21 @@ async function loadYesterdaySnapshot() {
 }
 
 function updateYesterdayBtn() {
-  const btn        = document.getElementById('yesterdayBtn');
-  const refreshBtn = document.getElementById('refreshBtn');
-  const todayRight = document.getElementById('todayBtnRight');
-  if (!btn) return;
+  const yesterdayBtn = document.getElementById('yesterdayBtn');
+  const todayBtn     = document.getElementById('todayBtnRightBtn');
+  const refreshBtn   = document.getElementById('refreshBtn');
+  if (!yesterdayBtn) return;
 
   if (viewingYesterday) {
-    // Viewing yesterday: hide left-side buttons, show today btn on the right
-    btn.style.display        = 'none';
-    refreshBtn.style.display = 'none';
-    todayRight.style.display = '';
+    // Viewing yesterday: show Today's Leaderboard, hide Yesterday + Refresh
+    yesterdayBtn.style.display = 'none';
+    todayBtn.style.display     = '';
+    refreshBtn.style.display   = 'none';
   } else {
-    // Viewing today: show normal buttons, hide right-side today btn
-    todayRight.style.display = 'none';
-    refreshBtn.style.display = '';
-    if (yesterdaySnapshot) {
-      btn.style.display  = '';
-      btn.textContent    = "Yesterday's Leaderboard";
-    } else {
-      btn.style.display  = 'none';
-    }
+    // Viewing today: show Yesterday (if available) + Refresh, hide Today btn
+    todayBtn.style.display     = 'none';
+    refreshBtn.style.display   = '';
+    yesterdayBtn.style.display = yesterdaySnapshot ? '' : 'none';
   }
 }
 
