@@ -388,6 +388,8 @@
     border-bottom: 1px solid rgba(30,61,85,0.7);
     align-items: center; transition: background 0.15s;
     animation: fadeIn 0.3s ease both;
+    position: relative;
+    min-height: 70px;
   }
   .lb-row:last-child { border-bottom: none; }
   .lb-row:hover { background: rgba(74,184,232,0.05); }
@@ -421,15 +423,16 @@
   }
   .nerd-badge {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    margin: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     width: 170px;
     max-width: 40%;
-    height: fit-content;
     opacity: 0.65;
     pointer-events: none;
     user-select: none;
     z-index: 2;
+    display: block;
   }
   @media (max-width: 600px) {
     .nerd-badge { width: 120px; max-width: 60%; }
