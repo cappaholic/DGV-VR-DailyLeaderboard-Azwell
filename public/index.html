@@ -419,20 +419,6 @@
   @media (max-width: 600px) {
     .cheater-stamp { width: 140px; top: 38%; max-width: 70%; }
   }
-  .nerd-badge {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 200px;
-    max-width: 50%;
-    opacity: 0.85;
-    pointer-events: none;
-    user-select: none;
-    z-index: 2;
-  }
-  @media (max-width: 600px) {
-    .nerd-badge { width: 140px; top: 38%; max-width: 70%; }
-  }
 
   .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); text-align: center; }
   .rank.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
@@ -639,23 +625,6 @@ function isFlagged(playerName) {
   return flaggedPlayers.has(playerName.toLowerCase());
 }
 
-// ── Nerd players (DGV VR Nerds) ────────────────────────────────────
-let nerdPlayers = new Set();
-
-async function loadNerdPlayers() {
-  try {
-    const res = await fetch('nerds.json?_=' + Date.now());
-    if (!res.ok) return;
-    const data = await res.json();
-    nerdPlayers = new Set((data.players || []).map(n => n.toLowerCase()));
-    console.log('[DGVR] Nerd players loaded:', nerdPlayers.size);
-  } catch(e) {}
-}
-
-function isNerd(playerName) {
-  return nerdPlayers.has(playerName.toLowerCase());
-}
-
 // ── Yesterday's leaderboard ──
 // Snapshot is fetched from /yesterday.json, which is written to public/
 // by the GitHub Actions workflow at 23:55 UTC daily and auto-deployed by Vercel.
@@ -755,13 +724,10 @@ function renderSnapshotLeaderboard(snap) {
     const rankCls     = getRankClass(rank);
     const playerName  = stripDiscTag(entry.playerName);
     const flagged     = isFlagged(playerName);
-    const nerd        = !flagged && isNerd(playerName);
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
-    const stamp       = flagged ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">`
-                      : nerd    ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
-                      : '';
+    const stamp       = flagged ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">` : '';
     return `
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
@@ -1140,13 +1106,10 @@ function renderLeaderboard() {
     const rankCls     = getRankClass(rank);
     const playerName  = stripDiscTag(entry.playerName);
     const flagged     = isFlagged(playerName);
-    const nerd        = !flagged && isNerd(playerName);
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
-    const stamp       = flagged ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">`
-                      : nerd    ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
-                      : '';
+    const stamp       = flagged ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">` : '';
     return `
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
@@ -1301,7 +1264,6 @@ async function autoLoadToken() {
 }
 
 loadFlaggedPlayers();
-loadNerdPlayers();
 loadYesterdaySnapshot();
 autoLoadToken();
 </script>
