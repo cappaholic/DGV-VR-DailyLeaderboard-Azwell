@@ -1,7 +1,10 @@
 name: Snapshot Daily Leaderboard
 
 on:
-  workflow_dispatch: # Triggered by cron-job.org via /api/trigger-snapshot or manually
+  schedule:
+    # Runs at 23:55 UTC — 5 minutes before midnight UTC reset (7:55 PM EDT / 8 PM EST in winter)
+    - cron: '55 23 * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub Actions tab
 
 jobs:
   snapshot:
@@ -81,10 +84,25 @@ jobs:
             else:
               ranks.append(i + 1)
 
+          # ── Fetch daily seed from CloudSave ──────────────────────
+          seed_value = None
+          try:
+            seed_url = f"{vercel_url}/api/cloudsave/v1/data/projects/{project_id}/custom/dailySeed/items"
+            req = urllib.request.Request(seed_url, headers={"Authorization": f"Bearer {access_token}"})
+            with urllib.request.urlopen(req) as r:
+              seed_data = json.loads(r.read())
+              seed_entry = next((x for x in seed_data.get("results", []) if x["key"] == "seed"), None)
+              if seed_entry:
+                seed_value = int(seed_entry["value"])
+                print(f"Seed fetched: {seed_value}")
+          except Exception as e:
+            print(f"Seed fetch failed: {e}")
+
           snapshot = {
             "scores": all_results,
             "ranks":  ranks,
-            "total":  total
+            "total":  total,
+            "seed":   seed_value
           }
 
           # ── Save to public/ so Vercel serves it at /yesterday.json ──
