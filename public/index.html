@@ -764,7 +764,9 @@ function renderSnapshotLeaderboard(snap) {
       if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(j);
       return acc;
     }, []);
-    const topNerd     = nerd && snapNerdIndices.length >= 2 && i === snapNerdIndices[0];
+    const snapMultipleNerds = snapNerdIndices.length >= 2;
+    const snapBestNerdRank  = snapMultipleNerds ? Math.min(...snapNerdIndices.map(j => snap.ranks[j])) : Infinity;
+    const topNerd     = nerd && snapMultipleNerds && rank === snapBestNerdRank;
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
@@ -1144,12 +1146,13 @@ function escapeHtml(str) {
 // ═══════════════════════════════════════════════════════════════════
 function renderLeaderboard() {
   const container = document.getElementById('lbRows');
-  // Count nerds on leaderboard — gold only shown if 2+ nerds present
+  // Gold badge: rank-1 nerd when 2+ nerds present; tied rank-1 nerds both get gold
   const nerdIndices = allScoresGlobal.reduce((acc, e, i) => {
     if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(i);
     return acc;
   }, []);
-  const topNerdIdx = nerdIndices.length >= 2 ? nerdIndices[0] : -1;
+  const multipleNerds = nerdIndices.length >= 2;
+  const bestNerdRank  = multipleNerds ? Math.min(...nerdIndices.map(i => globalRanks[i])) : Infinity;
   container.innerHTML = allScoresGlobal.map((entry, i) => {
     const rank        = globalRanks[i];
     const rankDisplay = getRankDisplay(rank, allScoresGlobal, i);
@@ -1157,7 +1160,7 @@ function renderLeaderboard() {
     const playerName  = stripDiscTag(entry.playerName);
     const flagged     = isFlagged(playerName);
     const nerd        = !flagged && isNerd(playerName);
-    const topNerd     = nerd && i === topNerdIdx;
+    const topNerd     = nerd && multipleNerds && rank === bestNerdRank;
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
