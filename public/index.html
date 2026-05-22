@@ -760,17 +760,11 @@ function renderSnapshotLeaderboard(snap) {
     const playerName  = stripDiscTag(entry.playerName);
     const flagged     = isFlagged(playerName);
     const nerd        = !flagged && isNerd(playerName);
-    const snapNerdIndices = snap.scores.reduce((acc, e, j) => {
-      if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(j);
-      return acc;
-    }, []);
-    const topNerd     = nerd && snapNerdIndices.length >= 2 && i === snapNerdIndices[0];
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
-    const stamp       = flagged  ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">`
-                      : topNerd  ? `<img class="nerd-badge" src="dgvr_nerd_gold.png" alt="DGV VR Nerd Gold">`
-                      : nerd     ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
+    const stamp       = flagged ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">`
+                      : nerd    ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
                       : '';
     return `
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
@@ -1144,12 +1138,6 @@ function escapeHtml(str) {
 // ═══════════════════════════════════════════════════════════════════
 function renderLeaderboard() {
   const container = document.getElementById('lbRows');
-  // Count nerds on leaderboard — gold only shown if 2+ nerds present
-  const nerdIndices = allScoresGlobal.reduce((acc, e, i) => {
-    if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(i);
-    return acc;
-  }, []);
-  const topNerdIdx = nerdIndices.length >= 2 ? nerdIndices[0] : -1;
   container.innerHTML = allScoresGlobal.map((entry, i) => {
     const rank        = globalRanks[i];
     const rankDisplay = getRankDisplay(rank, allScoresGlobal, i);
@@ -1157,13 +1145,11 @@ function renderLeaderboard() {
     const playerName  = stripDiscTag(entry.playerName);
     const flagged     = isFlagged(playerName);
     const nerd        = !flagged && isNerd(playerName);
-    const topNerd     = nerd && i === topNerdIdx;
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
-    const stamp       = flagged  ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">`
-                      : topNerd  ? `<img class="nerd-badge" src="dgvr_nerd_gold.png" alt="DGV VR Nerd Gold">`
-                      : nerd     ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
+    const stamp       = flagged ? `<img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater">`
+                      : nerd    ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
                       : '';
     return `
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
