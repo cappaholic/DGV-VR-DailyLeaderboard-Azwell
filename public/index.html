@@ -749,6 +749,14 @@ function renderSnapshotLeaderboard(snap) {
   const savedTotal  = totalScores;
   const savedPar    = seededPar;
 
+  // Set par to yesterday's value so VS Par calculates correctly
+  if (snap.seed) {
+    const yLayout = generateLayout(snap.seed);
+    seededPar = yLayout.totalPar;
+  } else if (snap.par) {
+    seededPar = snap.par;
+  }
+
   document.getElementById('resultsCount').innerHTML =
     `<span>${snap.total}</span> players on yesterday's leaderboard`;
 
