@@ -774,7 +774,7 @@ function renderSnapshotLeaderboard(snap) {
     }, []);
     const snapMultipleNerds = snapNerdIndices.length >= 2;
     const snapBestNerdRank  = snapMultipleNerds ? Math.min(...snapNerdIndices.map(j => snap.ranks[j])) : Infinity;
-    const topNerd     = nerd && snapMultipleNerds && rank === snapBestNerdRank;
+    const topNerd     = nerd && rank === snapBestNerdRank;
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
@@ -1168,7 +1168,7 @@ function renderLeaderboard() {
     const playerName  = stripDiscTag(entry.playerName);
     const flagged     = isFlagged(playerName);
     const nerd        = !flagged && isNerd(playerName);
-    const topNerd     = nerd && multipleNerds && rank === bestNerdRank;
+    const topNerd     = nerd && rank === bestNerdRank;
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
     const fmt         = formatVsPar(rawScore);
