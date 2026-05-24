@@ -773,7 +773,7 @@ function renderSnapshotLeaderboard(snap) {
       return acc;
     }, []);
     const snapMultipleNerds = snapNerdIndices.length >= 2;
-    const snapBestNerdRank  = snapMultipleNerds ? Math.min(...snapNerdIndices.map(j => snap.ranks[j])) : Infinity;
+    const snapBestNerdRank  = snapNerdIndices.length >= 1 ? Math.min(...snapNerdIndices.map(j => snap.ranks[j])) : Infinity;
     const topNerd     = nerd && rank === snapBestNerdRank;
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
@@ -1160,7 +1160,7 @@ function renderLeaderboard() {
     return acc;
   }, []);
   const multipleNerds = nerdIndices.length >= 2;
-  const bestNerdRank  = multipleNerds ? Math.min(...nerdIndices.map(i => globalRanks[i])) : Infinity;
+  const bestNerdRank  = nerdIndices.length >= 1 ? Math.min(...nerdIndices.map(i => globalRanks[i])) : Infinity;
   container.innerHTML = allScoresGlobal.map((entry, i) => {
     const rank        = globalRanks[i];
     const rankDisplay = getRankDisplay(rank, allScoresGlobal, i);
