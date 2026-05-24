@@ -1034,7 +1034,7 @@ function renderLayout(seed, layout) {
       <div class="course-block" style="border-top: 2px solid ${color};">
         <div class="course-block-header">
           <span class="course-block-num">Course ${ci + 1}</span>
-          <span class="course-block-subpar">Par ${entry.coursePar}</span>
+          <span class="course-block-subpar">PAR ${entry.coursePar}</span>
         </div>
         <div class="course-block-name" style="color:${color};">${entry.course.name}</div>
         <div class="holes-row" style="--course-color:${color};">${holeChips}</div>
@@ -1049,13 +1049,13 @@ function renderLayout(seed, layout) {
       <div class="scorecard-pip" style="--pip-color:${color}">
         <span class="scorecard-pip-label">Hole</span>
         <span class="scorecard-pip-num">${ci * 3 + hi + 1}</span>
-        <span class="scorecard-pip-par">Par ${h.par}</span>
+        <span class="scorecard-pip-par">PAR ${h.par}</span>
       </div>
     `);
   }).join('');
 
   document.getElementById('scorecardRow').innerHTML = scorecardHtml;
-  document.getElementById('scorecardParBadge').textContent = `Par ${layout.totalPar}`;
+  document.getElementById('scorecardParBadge').textContent = `PAR ${layout.totalPar}`;
   document.getElementById('scorecardSection').style.display = 'block';
 
   document.getElementById('layoutStrip').classList.add('show');
