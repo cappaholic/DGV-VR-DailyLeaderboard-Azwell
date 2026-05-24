@@ -206,6 +206,14 @@
     font-family: 'DM Mono', monospace;
     font-size: 9px; color: var(--muted); display: block; line-height: 1; margin-top: 1px;
   }
+  .dist-toggle-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 4px;
+    padding: 2px 8px; cursor: pointer; transition: color 0.2s, border-color 0.2s;
+  }
+  .dist-toggle-btn:hover { color: var(--white); border-color: var(--white); }
 
   /* ── 9-Hole Scorecard ── */
   .scorecard-row {
@@ -240,20 +248,6 @@
     font-size: 9px; color: var(--green-neon);
     display: block; line-height: 1; margin-top: 3px;
   }
-  .scorecard-pip-dist {
-    font-family: 'DM Mono', monospace;
-    font-size: 8px; color: var(--muted);
-    display: block; line-height: 1; margin-top: 2px;
-    text-transform: uppercase; letter-spacing: 1px;
-  }
-  .dist-toggle-btn {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
-    background: transparent; border: 1px solid var(--border);
-    color: var(--muted); border-radius: 4px;
-    padding: 2px 8px; cursor: pointer; transition: color 0.2s, border-color 0.2s;
-  }
-  .dist-toggle-btn:hover { color: var(--white); border-color: var(--white); }
 
   /* ── Config card ── */
   .card {
@@ -563,7 +557,10 @@
         <span class="layout-section-label">Today's Layout</span>
         <span class="seed-badge" id="seedBadge" style="display:none">Seed —</span>
       </div>
-      <span id="layoutParBadge" style="display:none">—</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="dist-toggle-btn" id="distToggleBtn" onclick="toggleDistUnit()">FT / M</button>
+        <span id="layoutParBadge" style="display:none">—</span>
+      </div>
     </div>
     <div class="courses-row" id="coursesRow"></div>
   </div>
@@ -572,10 +569,7 @@
   <div class="layout-strip" id="scorecardSection" style="display:none;margin-bottom:16px;">
     <div class="layout-top-row" style="margin-bottom:14px;">
       <span class="layout-section-label">Today's Par</span>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="dist-toggle-btn" id="distToggleBtn" onclick="toggleDistUnit()">FT / M</button>
-        <span class="course-block-subpar" id="scorecardParBadge">—</span>
-      </div>
+      <span class="course-block-subpar" id="scorecardParBadge">—</span>
     </div>
     <div class="scorecard-row" id="scorecardRow"></div>
   </div>
@@ -961,8 +955,34 @@ function generateLayout(seed) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Distance unit toggle
+//  Hole distance data & unit toggle
 // ═══════════════════════════════════════════════════════════════════
+const HOLE_DISTANCES = {
+  'Sunshine Glade':    { ft: { 1:199, 2:269, 3:246, 4:243, 5:495 },
+                         m:  { 1:61,  2:82,  3:75,  4:74,  5:151 } },
+  'Blueberry Thicket': { ft: { 1:301, 2:271, 3:490, 4:293, 5:346, 6:234, 7:219, 8:224, 9:281 },
+                         m:  { 1:92,  2:83,  3:149, 4:89,  5:105, 6:71,  7:67,  8:68,  9:86  } },
+  'Oak Hill':          { ft: { 1:576, 2:289, 3:622, 4:517, 5:553, 6:447, 7:672, 8:593, 9:347 },
+                         m:  { 1:176, 2:88,  3:190, 4:158, 5:168, 6:136, 7:205, 8:181, 9:106 } },
+  'Lakeside':          { ft: { 1:309, 2:433, 3:297, 4:480, 5:556, 6:232, 7:296, 8:289, 9:726 },
+                         m:  { 1:94,  2:132, 3:91,  4:146, 5:169, 6:71,  7:90,  8:88,  9:221 } },
+  'Windswept Fields':  { ft: { 1:326, 2:535, 3:520, 4:396, 5:404, 6:260, 7:251, 8:298, 9:314 },
+                         m:  { 1:99,  2:163, 3:158, 4:121, 5:123, 6:79,  7:77,  8:91,  9:96  } },
+  'Harrowing Woods':   { ft: { 1:368, 2:324, 3:303, 4:257, 5:365, 6:406, 7:277, 8:355, 9:783 },
+                         m:  { 1:112, 2:99,  3:92,  4:78,  5:111, 6:124, 7:84,  8:108, 9:239 } },
+  'Crows Nest':        { ft: { 1:266, 2:245, 3:332, 4:199, 5:640, 6:187, 7:329, 8:327, 9:497 },
+                         m:  { 1:81,  2:75,  3:101, 4:61,  5:195, 6:57,  7:100, 8:100, 9:151 } },
+  'Grizzly Gulch':     { ft: { 1:357, 2:368, 3:347, 4:328, 5:435, 6:462, 7:448, 8:511, 9:484 },
+                         m:  { 1:109, 2:112, 3:106, 4:100, 5:133, 6:142, 7:137, 8:156, 9:147 } },
+};
+
+function getHoleDist(courseName, holeNum) {
+  const cd = HOLE_DISTANCES[courseName];
+  if (!cd) return '';
+  const val = cd[distUnit][holeNum];
+  return val ? val + ' ' + distUnit.toUpperCase() : '';
+}
+
 function toggleDistUnit() {
   distUnit = distUnit === 'ft' ? 'm' : 'ft';
   const btn = document.getElementById('distToggleBtn');
@@ -985,33 +1005,6 @@ function renderLayout(seed, layout) {
   seededPar = layout.totalPar;
 
   // Map each course name to its identity color
-  // ── Hole distances from spreadsheet (Dist. and Par tab) ──
-  const HOLE_DISTANCES = {
-    'Sunshine Glade':    { ft: { 1:199, 2:269, 3:246, 4:243, 5:495 },
-                           m:  { 1:61,  2:82,  3:75,  4:74,  5:151 } },
-    'Blueberry Thicket': { ft: { 1:301, 2:271, 3:490, 4:293, 5:346, 6:234, 7:219, 8:224, 9:281 },
-                           m:  { 1:92,  2:83,  3:149, 4:89,  5:105, 6:71,  7:67,  8:68,  9:86  } },
-    'Oak Hill':          { ft: { 1:576, 2:289, 3:622, 4:517, 5:553, 6:447, 7:672, 8:593, 9:347 },
-                           m:  { 1:176, 2:88,  3:190, 4:158, 5:168, 6:136, 7:205, 8:181, 9:106 } },
-    'Lakeside':          { ft: { 1:309, 2:433, 3:297, 4:480, 5:556, 6:232, 7:296, 8:289, 9:726 },
-                           m:  { 1:94,  2:132, 3:91,  4:146, 5:169, 6:71,  7:90,  8:88,  9:221 } },
-    'Windswept Fields':  { ft: { 1:326, 2:535, 3:520, 4:396, 5:404, 6:260, 7:251, 8:298, 9:314 },
-                           m:  { 1:99,  2:163, 3:158, 4:121, 5:123, 6:79,  7:77,  8:91,  9:96  } },
-    'Harrowing Woods':   { ft: { 1:368, 2:324, 3:303, 4:257, 5:365, 6:406, 7:277, 8:355, 9:783 },
-                           m:  { 1:112, 2:99,  3:92,  4:78,  5:111, 6:124, 7:84,  8:108, 9:239 } },
-    'Crows Nest':        { ft: { 1:266, 2:245, 3:332, 4:199, 5:640, 6:187, 7:329, 8:327, 9:497 },
-                           m:  { 1:81,  2:75,  3:101, 4:61,  5:195, 6:57,  7:100, 8:100, 9:151 } },
-    'Grizzly Gulch':     { ft: { 1:357, 2:368, 3:347, 4:328, 5:435, 6:462, 7:448, 8:511, 9:484 },
-                           m:  { 1:109, 2:112, 3:106, 4:100, 5:133, 6:142, 7:137, 8:156, 9:147 } },
-  };
-
-  function getHoleDist(courseName, holeNum) {
-    const cd = HOLE_DISTANCES[courseName];
-    if (!cd) return '';
-    const val = cd[distUnit][holeNum];
-    return val ? val + ' ' + distUnit.toUpperCase() : '';
-  }
-
   const COURSE_COLORS = {
     'Sunshine Glade':    'var(--course-sunshine)',
     'Blueberry Thicket': 'var(--course-blueberry)',
@@ -1057,7 +1050,6 @@ function renderLayout(seed, layout) {
         <span class="scorecard-pip-label">Hole</span>
         <span class="scorecard-pip-num">${ci * 3 + hi + 1}</span>
         <span class="scorecard-pip-par">Par ${h.par}</span>
-        <span class="scorecard-pip-dist">${getHoleDist(entry.course.name, h.holeNum)}</span>
       </div>
     `);
   }).join('');
