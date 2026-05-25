@@ -573,7 +573,7 @@
       <button class="dist-toggle-btn" id="distToggleBtn" onclick="toggleDistUnit()">FT / M</button>
     </div>
     <div class="scorecard-row" id="scorecardRow"></div>
-    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);text-align:right">
+    <div style="margin-top:14px;text-align:right">
       <span class="course-block-subpar" id="scorecardParBadge">—</span>
     </div>
   </div>
@@ -1058,7 +1058,7 @@ function renderLayout(seed, layout) {
   }).join('');
 
   document.getElementById('scorecardRow').innerHTML = scorecardHtml;
-  document.getElementById('scorecardParBadge').textContent = `PAR ${layout.totalPar}`;
+  document.getElementById('scorecardParBadge').textContent = `TOTAL PAR ${layout.totalPar}`;
   document.getElementById('scorecardSection').style.display = 'block';
 
   document.getElementById('layoutStrip').classList.add('show');
