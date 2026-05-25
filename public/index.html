@@ -162,7 +162,7 @@
   .course-block-header {
     display: flex; align-items: baseline;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 8px; gap: 8px;
   }
   .course-block-num {
     font-family: 'DM Mono', monospace;
@@ -173,10 +173,9 @@
     font-size: 10px; color: var(--green-neon);
   }
   .course-block-name {
-    font-size: 13px; font-weight: 600;
-    color: var(--white);
-    margin-bottom: 8px;
+    font-size: 12px; font-weight: 600;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-align: right;
   }
   .holes-row {
     display: flex; gap: 5px;
@@ -245,7 +244,12 @@
   }
   .scorecard-pip-par {
     font-family: 'DM Mono', monospace;
-    font-size: 9px; color: var(--green-neon);
+    font-size: 9px; color: var(--muted);
+    display: block; line-height: 1; margin-top: 3px;
+  }
+  .scorecard-pip-dist {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--muted);
     display: block; line-height: 1; margin-top: 3px;
   }
 
@@ -554,13 +558,10 @@
   <div class="layout-strip" id="layoutStrip">
     <div class="layout-top-row">
       <div class="layout-title-group">
-        <span class="layout-section-label">Today's Layout</span>
+        <span class="layout-section-label">Today's Courses</span>
         <span class="seed-badge" id="seedBadge" style="display:none">Seed —</span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="dist-toggle-btn" id="distToggleBtn" onclick="toggleDistUnit()">FT / M</button>
-        <span id="layoutParBadge" style="display:none">—</span>
-      </div>
+      <span id="layoutParBadge" style="display:none">—</span>
     </div>
     <div class="courses-row" id="coursesRow"></div>
   </div>
@@ -568,10 +569,13 @@
   <!-- ── 9-Hole Scorecard ── -->
   <div class="layout-strip" id="scorecardSection" style="display:none;margin-bottom:16px;">
     <div class="layout-top-row" style="margin-bottom:14px;">
-      <span class="layout-section-label">Today's Par</span>
-      <span class="course-block-subpar" id="scorecardParBadge">—</span>
+      <span class="layout-section-label">Today's Layout</span>
+      <button class="dist-toggle-btn" id="distToggleBtn" onclick="toggleDistUnit()">FT / M</button>
     </div>
     <div class="scorecard-row" id="scorecardRow"></div>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);text-align:right">
+      <span class="course-block-subpar" id="scorecardParBadge">—</span>
+    </div>
   </div>
 
   <!-- ── Leaderboard section ── -->
@@ -724,8 +728,8 @@ function toggleYesterdayLeaderboard() {
     renderSnapshotLeaderboard(yesterdaySnapshot);
     document.getElementById('yesterdayBanner').style.display = '';
     // Switch layout labels and border color to yesterday mode
-    document.querySelector('#layoutStrip .layout-section-label').textContent = "Yesterday's Layout";
-    document.querySelector('#scorecardSection .layout-section-label').textContent = "Yesterday's Par";
+    document.querySelector('#layoutStrip .layout-section-label').textContent = "Yesterday's Courses";
+    document.querySelector('#scorecardSection .layout-section-label').textContent = "Yesterday's Layout";
     document.getElementById('layoutStrip').classList.add('yesterday-mode');
     document.getElementById('scorecardSection').classList.add('yesterday-mode');
     // Render yesterday's layout if snapshot contains seed
@@ -741,8 +745,8 @@ function showTodayLeaderboard() {
   viewingYesterday = false;
   document.getElementById('yesterdayBanner').style.display = 'none';
   // Restore layout labels and border color
-  document.querySelector('#layoutStrip .layout-section-label').textContent = "Today's Layout";
-  document.querySelector('#scorecardSection .layout-section-label').textContent = "Today's Par";
+  document.querySelector('#layoutStrip .layout-section-label').textContent = "Today's Courses";
+  document.querySelector('#scorecardSection .layout-section-label').textContent = "Today's Layout";
   document.getElementById('layoutStrip').classList.remove('yesterday-mode');
   document.getElementById('scorecardSection').classList.remove('yesterday-mode');
   // Restore today's layout
@@ -1026,7 +1030,6 @@ function renderLayout(seed, layout) {
       <div class="hole-pip">
         <span class="hole-pip-num">Hole</span>
         <span class="hole-pip-n">${h.holeNum}</span>
-        <span class="hole-pip-dist">${getHoleDist(entry.course.name, h.holeNum)}</span>
       </div>
     `).join('');
 
@@ -1034,9 +1037,8 @@ function renderLayout(seed, layout) {
       <div class="course-block" style="border-top: 2px solid ${color};">
         <div class="course-block-header">
           <span class="course-block-num">Course ${ci + 1}</span>
-          <span class="course-block-subpar">PAR ${entry.coursePar}</span>
+          <span class="course-block-name" style="color:${color};">${entry.course.name}</span>
         </div>
-        <div class="course-block-name" style="color:${color};">${entry.course.name}</div>
         <div class="holes-row" style="--course-color:${color};">${holeChips}</div>
       </div>
     `;
@@ -1048,7 +1050,8 @@ function renderLayout(seed, layout) {
     return entry.holes.map((h, hi) => `
       <div class="scorecard-pip" style="--pip-color:${color}">
         <span class="scorecard-pip-label">Hole</span>
-        <span class="scorecard-pip-num">${ci * 3 + hi + 1}</span>
+        <span class="scorecard-pip-num">${h.holeNum}</span>
+        <span class="scorecard-pip-dist">${getHoleDist(entry.course.name, h.holeNum)}</span>
         <span class="scorecard-pip-par">PAR ${h.par}</span>
       </div>
     `);
