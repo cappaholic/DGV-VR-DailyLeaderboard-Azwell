@@ -1050,7 +1050,7 @@ function renderLayout(seed, layout) {
     return entry.holes.map((h, hi) => `
       <div class="scorecard-pip" style="--pip-color:${color}">
         <span class="scorecard-pip-label">Hole</span>
-        <span class="scorecard-pip-num">${h.holeNum}</span>
+        <span class="scorecard-pip-num">${ci * 3 + hi + 1}</span>
         <span class="scorecard-pip-dist">${getHoleDist(entry.course.name, h.holeNum)}</span>
         <span class="scorecard-pip-par">PAR ${h.par}</span>
       </div>
