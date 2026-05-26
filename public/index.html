@@ -253,6 +253,82 @@
     display: block; line-height: 1; margin-top: 3px;
   }
 
+  /* ── Player history modal ── */
+  .history-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.72); z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .history-overlay.open { display: flex; }
+  .history-modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-top: 2px solid var(--accent2);
+    border-radius: 10px; padding: 24px 28px;
+    width: 360px; max-width: 92vw;
+    font-family: 'DM Mono', monospace;
+  }
+  .history-modal-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px; color: var(--white);
+    margin-bottom: 16px; text-align: center;
+  }
+  .history-tab-row {
+    display: flex; gap: 8px; margin-bottom: 20px;
+  }
+  .history-tab {
+    flex: 1; font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 4px;
+    padding: 5px 0; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .history-tab.active {
+    border-color: var(--accent2); color: var(--accent2);
+    background: rgba(240,180,41,0.08);
+  }
+  .history-content { text-align: center; min-height: 90px; }
+  .history-unavailable {
+    font-size: 11px; color: var(--muted); letter-spacing: 1px;
+    text-transform: uppercase; padding: 28px 0;
+  }
+  .history-stat-row {
+    display: flex; justify-content: space-around;
+    margin-bottom: 18px; gap: 8px;
+  }
+  .history-stat {
+    flex: 1; background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 4px; text-align: center;
+  }
+  .history-stat-label {
+    font-size: 8px; color: var(--muted);
+    letter-spacing: 1px; text-transform: uppercase;
+    display: block; margin-bottom: 4px;
+  }
+  .history-stat-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px; color: var(--white);
+    display: block; line-height: 1;
+  }
+  .history-stat-value.under { color: var(--green-neon); }
+  .history-stat-value.over  { color: #e05c5c; }
+  .history-stat-value.even  { color: var(--white); }
+  .history-played {
+    font-size: 10px; color: var(--muted); letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 20px;
+  }
+  .history-close-btn {
+    display: block; width: 100%;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 4px;
+    padding: 7px 0; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .history-close-btn:hover { color: var(--white); border-color: var(--white); }
+
   /* ── Config card ── */
   .card {
     background: var(--card);
@@ -804,7 +880,7 @@ function renderSnapshotLeaderboard(snap) {
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
         <div class="rank ${flagged ? '' : rankCls}">${rankDisplay}</div>
-        <div><div class="player-name">${escapeHtml(playerName)}</div></div>
+        <div><div class="player-name" onclick="openHistoryModal('${escapeHtml(playerName)}')" style="cursor:pointer">${escapeHtml(playerName)}</div></div>
         <div class="score-cell">
           <div class="score-vs-par ${flagged ? 'even' : fmt.cls}">${fmt.display}</div>
           <div class="score-raw">${fmt.label}</div>
@@ -1241,7 +1317,7 @@ function renderLeaderboard() {
         ${stamp}
         <div class="rank ${flagged ? '' : rankCls}">${rankDisplay}</div>
         <div>
-          <div class="player-name">${escapeHtml(playerName)}</div>
+          <div class="player-name" onclick="openHistoryModal('${escapeHtml(playerName)}')" style="cursor:pointer">${escapeHtml(playerName)}</div>
         </div>
         <div class="score-cell">
           <div class="score-vs-par ${flagged ? 'even' : fmt.cls}">${fmt.display}</div>
@@ -1257,6 +1333,93 @@ function renderLeaderboard() {
 
   document.getElementById('resultsCount').innerHTML =
     `<span>${totalScores}</span> players on today's leaderboard`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Player history modal
+// ═══════════════════════════════════════════════════════════════════
+let historyData       = null;   // full parsed history.json array
+let historyLoaded     = false;
+let currentHistoryTab = 7;
+
+async function loadHistoryData() {
+  if (historyLoaded) return;
+  try {
+    const res = await fetch('history.json?_=' + Date.now());
+    if (!res.ok) { historyData = []; }
+    else { historyData = await res.json(); }
+  } catch(e) {
+    historyData = [];
+  }
+  historyLoaded = true;
+}
+
+function openHistoryModal(playerName) {
+  document.getElementById('historyPlayerName').textContent = playerName;
+  document.getElementById('historyOverlay').classList.add('open');
+  currentHistoryTab = 7;
+  document.getElementById('tab7').classList.add('active');
+  document.getElementById('tab30').classList.remove('active');
+  loadHistoryData().then(() => renderHistoryContent(playerName, 7));
+}
+
+function closeHistoryModal() {
+  document.getElementById('historyOverlay').classList.remove('open');
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('historyOverlay')) closeHistoryModal();
+}
+
+function switchHistoryTab(days) {
+  currentHistoryTab = days;
+  document.getElementById('tab7').classList.toggle('active',  days === 7);
+  document.getElementById('tab30').classList.toggle('active', days === 30);
+  const name = document.getElementById('historyPlayerName').textContent;
+  renderHistoryContent(name, days);
+}
+
+function renderHistoryContent(playerName, days) {
+  const el = document.getElementById('historyContent');
+  if (!historyData || historyData.length < days) {
+    el.innerHTML = `<div class="history-unavailable">Data not yet available</div>`;
+    return;
+  }
+  // Use only the most recent `days` entries
+  const window = historyData.slice(-days);
+  const played = window.filter(day =>
+    day.players.some(p => stripDiscTag(p.name) === playerName || p.name === playerName)
+  );
+  if (played.length === 0) {
+    el.innerHTML = `<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
+    return;
+  }
+  const avgRank  = played.reduce((s, d) => {
+    const p = d.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+    return s + p.rank;
+  }, 0) / played.length;
+  const avgVsPar = played.reduce((s, d) => {
+    const p = d.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+    return s + p.vsPar;
+  }, 0) / played.length;
+
+  const vsParDisplay = avgVsPar === 0 ? 'E'
+    : (avgVsPar > 0 ? '+' : '') + avgVsPar.toFixed(1);
+  const vsParCls = avgVsPar < 0 ? 'under' : avgVsPar > 0 ? 'over' : 'even';
+
+  el.innerHTML = `
+    <div class="history-stat-row">
+      <div class="history-stat">
+        <span class="history-stat-label">Avg Rank</span>
+        <span class="history-stat-value">${avgRank.toFixed(1)}</span>
+      </div>
+      <div class="history-stat">
+        <span class="history-stat-label">Avg VS Par</span>
+        <span class="history-stat-value ${vsParCls}">${vsParDisplay}</span>
+      </div>
+    </div>
+    <div class="history-played">Played ${played.length} of ${days} days</div>
+  `;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1394,5 +1557,18 @@ loadNerdPlayers();
 loadYesterdaySnapshot();
 autoLoadToken();
 </script>
+  <!-- ── Player history modal ── -->
+  <div class="history-overlay" id="historyOverlay" onclick="handleOverlayClick(event)">
+    <div class="history-modal">
+      <div class="history-modal-name" id="historyPlayerName">—</div>
+      <div class="history-tab-row">
+        <button class="history-tab active" id="tab7"  onclick="switchHistoryTab(7)">7 Day</button>
+        <button class="history-tab"        id="tab30" onclick="switchHistoryTab(30)">30 Day</button>
+      </div>
+      <div class="history-content" id="historyContent"></div>
+      <button class="history-close-btn" onclick="closeHistoryModal()">Close</button>
+    </div>
+  </div>
+
 </body>
 </html>
