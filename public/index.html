@@ -1357,6 +1357,15 @@ async function loadHistoryData() {
 function openHistoryModal(playerName) {
   document.getElementById('historyPlayerName').textContent = playerName;
   document.getElementById('historyOverlay').classList.add('open');
+  if (isFlagged(playerName)) {
+    document.getElementById('tab7').classList.remove('active');
+    document.getElementById('tab30').classList.remove('active');
+    document.getElementById('historyContent').innerHTML =
+      `<div style="padding:20px 0;display:flex;justify-content:center;">
+         <img class="cheater-stamp" src="cheater_stamp.png" alt="Known Cheater" style="position:static;transform:none;opacity:1;width:180px;">
+       </div>`;
+    return;
+  }
   currentHistoryTab = 7;
   document.getElementById('tab7').classList.add('active');
   document.getElementById('tab30').classList.remove('active');
