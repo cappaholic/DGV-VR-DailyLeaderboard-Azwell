@@ -53,7 +53,8 @@ jobs:
 
           # Fetch remaining pages if needed and merge all results
           python3 << EOF
-          import json, urllib.request, math
+          import json, urllib.request, math, re
+          from datetime import datetime, timezone
 
           access_token = "$ACCESS_TOKEN"
           vercel_url   = "$VERCEL_URL"
@@ -107,12 +108,110 @@ jobs:
             json.dump(snapshot, f)
 
           print(f"Snapshot saved with {len(all_results)} entries.")
+
+          # ── Append to history.json ───────────────────────────────
+          # Strip disc tags (e.g. "PlayerName#1234" -> "PlayerName")
+          def strip_disc_tag(name):
+            return re.sub(r'#\d{1,6}$', '', name or 'Anonymous').strip()
+
+          today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+          # Compute vs par from seed if available
+          def compute_vs_par(score, seed):
+            if seed is None:
+              return None
+            # Minimal LCG matching the JS generateLayout logic
+            # We can't replicate the full JS layout here, so store raw score
+            # and let the front-end compute vs par from history if needed.
+            # For now store the raw score; vsPar will be filled in below.
+            return None
+
+          # Build per-player history entries using ranks we already computed
+          history_players = []
+          for i, entry in enumerate(all_results):
+            raw_score = entry.get("score", 0)
+            rank      = ranks[i]
+            # vs par: if we have seed, we'd need to replicate JS layout math.
+            # Store raw score; front-end already knows par from seed in history entry.
+            history_players.append({
+              "name":   strip_disc_tag(entry.get("playerName", "Anonymous")),
+              "rank":   rank,
+              "score":  raw_score,
+              "vsPar":  None   # filled below if seed available
+            })
+
+          # Compute total par from seed using the same LCG as the JS front-end
+          total_par = None
+          if seed_value is not None:
+            try:
+              # Replicate JS generateLayout LCG to get total par
+              COURSES = [
+                {"name":"Sunshine Glade",    "holes":[4,4,4,5,5]},
+                {"name":"Blueberry Thicket", "holes":[3,3,4,3,4,3,3,3,3]},
+                {"name":"Oak Hill",          "holes":[5,3,5,5,5,4,5,5,4]},
+                {"name":"Lakeside",          "holes":[3,4,3,4,5,3,3,3,5]},
+                {"name":"Windswept Fields",  "holes":[3,4,4,4,4,3,3,3,3]},
+                {"name":"Harrowing Woods",   "holes":[3,3,3,3,3,4,3,4,5]},
+                {"name":"Crows Nest",        "holes":[3,3,3,3,5,3,3,3,4]},
+                {"name":"Grizzly Gulch",     "holes":[3,3,3,3,4,4,4,4,3]},
+              ]
+              seed = seed_value
+              def lcg_next(s):
+                return (s * 1664525 + 1013904223) & 0xFFFFFFFF
+              def lcg_range(s, n):
+                s = lcg_next(s)
+                return s, s % n
+
+              selected = []
+              s = seed
+              course_indices = list(range(len(COURSES)))
+              for _ in range(3):
+                s, idx = lcg_range(s, len(course_indices))
+                selected.append(course_indices.pop(idx))
+
+              total_par = 0
+              for ci, course_idx in enumerate(selected):
+                course = COURSES[course_idx]
+                hole_indices = list(range(len(course["holes"])))
+                for _ in range(3):
+                  s, hi = lcg_range(s, len(hole_indices))
+                  total_par += course["holes"][hole_indices.pop(hi)]
+
+              print(f"Computed total par from seed: {total_par}")
+              for p in history_players:
+                p["vsPar"] = p["score"] - total_par
+            except Exception as e:
+              print(f"Par computation failed: {e}")
+
+          history_entry = {
+            "date":    today_str,
+            "seed":    seed_value,
+            "par":     total_par,
+            "players": history_players
+          }
+
+          # Load existing history, append, save
+          history_path = "public/history.json"
+          try:
+            with open(history_path, "r") as f:
+              history = json.load(f)
+          except (FileNotFoundError, json.JSONDecodeError):
+            history = []
+
+          # Remove any existing entry for today (in case workflow runs twice)
+          history = [d for d in history if d.get("date") != today_str]
+          history.append(history_entry)
+
+          with open(history_path, "w") as f:
+            json.dump(history, f)
+
+          print(f"History updated: {len(history)} total days recorded.")
           EOF
 
       - name: Commit snapshot to repo
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/yesterday.json
+          git add public/yesterday.json public/history.json
           git diff --staged --quiet || git commit -m "chore: daily leaderboard snapshot [skip ci]"
           git push
