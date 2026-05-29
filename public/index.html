@@ -658,8 +658,11 @@
 
   <!-- ── Leaderboard section ── -->
   <div id="leaderboardSection" style="display:none">
-    <div class="controls-row">
+    <div class="controls-row" style="position:relative;">
       <div class="results-count" id="resultsCount"></div>
+      <div id="cheaterFilterCenter" style="position:absolute; left:50%; transform:translateX(-50%);">
+        <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()">Remove Cheaters</button>
+      </div>
       <div id="todayViewBtns" class="btn-group">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
         <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
@@ -667,9 +670,6 @@
       <div id="yesterdayViewBtns" style="display:none;">
         <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()" style="width:100%;">Today's Leaderboard</button>
       </div>
-    </div>
-    <div id="cheaterFilterRow" style="display:none; text-align:center; margin-bottom:12px;">
-      <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()">Remove Cheaters</button>
     </div>
     <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:#e8833a;text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(232,131,58,0.2);">
       Viewing Yesterday's Leaderboard
@@ -784,11 +784,10 @@ function updateYesterdayBtn() {
   const yesterdayBtn      = document.getElementById('yesterdayBtn');
   const todayViewBtns     = document.getElementById('todayViewBtns');
   const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
-  const cheaterFilterRow  = document.getElementById('cheaterFilterRow');
   const cheaterBtn        = document.getElementById('cheaterFilterBtn');
   if (!yesterdayBtn) return;
 
-  // Keep button label synced to shared state
+  // Keep label synced to shared state
   if (cheaterBtn) {
     cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
   }
@@ -798,22 +797,11 @@ function updateYesterdayBtn() {
     todayViewBtns.style.display     = 'none';
     yesterdayViewBtns.style.display = '';
     if (w > 0) yesterdayViewBtns.style.width = w + 'px';
-    // Show cheater row if yesterday's snapshot has flagged players
-    if (cheaterFilterRow) {
-      const hasCheaters = yesterdaySnapshot && yesterdaySnapshot.scores &&
-        yesterdaySnapshot.scores.some(e => isFlagged(stripDiscTag(e.playerName)));
-      cheaterFilterRow.style.display = hasCheaters ? '' : 'none';
-    }
   } else {
     yesterdayViewBtns.style.display = 'none';
     yesterdayViewBtns.style.width   = '';
     todayViewBtns.style.display     = '';
     yesterdayBtn.style.display      = yesterdaySnapshot ? '' : 'none';
-    // Show cheater row if today's board has flagged players
-    if (cheaterFilterRow) {
-      const hasCheaters = allScoresGlobal.some(e => isFlagged(stripDiscTag(e.playerName)));
-      cheaterFilterRow.style.display = hasCheaters ? '' : 'none';
-    }
   }
 }
 
