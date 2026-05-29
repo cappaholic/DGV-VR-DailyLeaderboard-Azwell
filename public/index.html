@@ -456,6 +456,11 @@
 
   .refresh-btn:hover { border-color: var(--green-neon); color: var(--green-neon); }
 
+  .cheater-filter-btn { border-color: rgba(224,92,92,0.5); color: #e05c5c; }
+  .cheater-filter-btn:hover { border-color: #e05c5c; color: #e05c5c; background: rgba(224,92,92,0.08); }
+  .cheater-filter-btn.showing { border-color: rgba(46,207,170,0.5); color: var(--accent2); }
+  .cheater-filter-btn.showing:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(46,207,170,0.08); }
+
   .leaderboard {
     background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
   }
@@ -660,9 +665,11 @@
       <div class="results-count" id="resultsCount"></div>
       <div id="todayViewBtns" class="btn-group">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
+        <button class="refresh-btn cheater-filter-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()" style="display:none">Remove Cheaters</button>
         <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
       </div>
-      <div id="yesterdayViewBtns" style="display:none;">
+      <div id="yesterdayViewBtns" style="display:none;" class="btn-group">
+        <button class="refresh-btn cheater-filter-btn" id="cheaterFilterBtnYesterday" onclick="toggleCheaterFilter()" style="display:none">Remove Cheaters</button>
         <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()" style="width:100%;">Today's Leaderboard</button>
       </div>
     </div>
@@ -759,6 +766,7 @@ function isNerd(playerName) {
 let yesterdaySnapshot = null;
 let distUnit = 'ft'; // 'ft' or 'm'
 let viewingYesterday  = false;
+let cheatersHidden    = false; // tracks whether cheaters are filtered out
 
 async function loadYesterdaySnapshot() {
   try {
@@ -778,7 +786,21 @@ function updateYesterdayBtn() {
   const yesterdayBtn      = document.getElementById('yesterdayBtn');
   const todayViewBtns     = document.getElementById('todayViewBtns');
   const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
+  const cheaterBtn        = document.getElementById('cheaterFilterBtn');
+  const cheaterBtnYest    = document.getElementById('cheaterFilterBtnYesterday');
   if (!yesterdayBtn) return;
+
+  // Always keep both button labels in sync with the shared cheatersHidden state
+  [cheaterBtn, cheaterBtnYest].forEach(btn => {
+    if (!btn) return;
+    if (cheatersHidden) {
+      btn.textContent = 'Show Cheaters';
+      btn.classList.add('showing');
+    } else {
+      btn.textContent = 'Remove Cheaters';
+      btn.classList.remove('showing');
+    }
+  });
 
   if (viewingYesterday) {
     // Capture today row width before hiding, apply to yesterday container
@@ -786,12 +808,47 @@ function updateYesterdayBtn() {
     todayViewBtns.style.display     = 'none';
     yesterdayViewBtns.style.display = '';
     if (w > 0) yesterdayViewBtns.style.width = w + 'px';
+    // Show/hide yesterday cheater btn based on whether any flagged players are in snapshot
+    if (yesterdaySnapshot && yesterdaySnapshot.scores) {
+      const hasCheatersYest = yesterdaySnapshot.scores.some(e => isFlagged(stripDiscTag(e.playerName)));
+      if (cheaterBtnYest) cheaterBtnYest.style.display = hasCheatersYest ? '' : 'none';
+    }
   } else {
     // Today view: show normal row, hide yesterday view button
     yesterdayViewBtns.style.display = 'none';
     yesterdayViewBtns.style.width   = '';
     todayViewBtns.style.display     = '';
     yesterdayBtn.style.display      = yesterdaySnapshot ? '' : 'none';
+    // Show cheater btn only if any flagged players are on today's board
+    if (cheaterBtn) {
+      const hasCheaters = allScoresGlobal.some(e => isFlagged(stripDiscTag(e.playerName)));
+      cheaterBtn.style.display = hasCheaters ? '' : 'none';
+    }
+  }
+}
+
+// ── Cheater filter toggle ──────────────────────────────────────────
+function toggleCheaterFilter() {
+  cheatersHidden = !cheatersHidden;
+
+  // Update both possible buttons
+  ['cheaterFilterBtn', 'cheaterFilterBtnYesterday'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    if (cheatersHidden) {
+      btn.textContent = 'Show Cheaters';
+      btn.classList.add('showing');
+    } else {
+      btn.textContent = 'Remove Cheaters';
+      btn.classList.remove('showing');
+    }
+  });
+
+  // Re-render whichever leaderboard is active
+  if (viewingYesterday && yesterdaySnapshot) {
+    renderSnapshotLeaderboard(yesterdaySnapshot);
+  } else {
+    renderLeaderboard();
   }
 }
 
@@ -851,23 +908,33 @@ function renderSnapshotLeaderboard(snap) {
     seededPar = snap.par;
   }
 
+  // Filter cheaters if hidden
+  const displayScores = cheatersHidden
+    ? snap.scores.filter(e => !isFlagged(stripDiscTag(e.playerName)))
+    : snap.scores;
+  const displayRanks = cheatersHidden
+    ? computeTiedRanks(displayScores)
+    : snap.ranks;
+
+  // Map original snap rank indices for nerd detection (on the filtered set)
+  const snapNerdIndices = displayScores.reduce((acc, e, j) => {
+    if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(j);
+    return acc;
+  }, []);
+  const snapMultipleNerds = snapNerdIndices.length >= 2;
+  const snapBestNerdRank  = snapNerdIndices.length >= 1 ? Math.min(...snapNerdIndices.map(j => displayRanks[j])) : Infinity;
+
   document.getElementById('resultsCount').innerHTML =
-    `<span>${snap.total}</span> players on yesterday's leaderboard`;
+    `<span>${displayScores.length}</span> players on yesterday's leaderboard`;
 
   const container = document.getElementById('lbRows');
-  container.innerHTML = snap.scores.map((entry, i) => {
-    const rank        = snap.ranks[i];
-    const rankDisplay = getRankDisplay(rank, snap.scores, i);
+  container.innerHTML = displayScores.map((entry, i) => {
+    const rank        = displayRanks[i];
+    const rankDisplay = getRankDisplay(rank, displayScores, i);
     const rankCls     = getRankClass(rank);
     const playerName  = stripDiscTag(entry.playerName);
     const flagged     = isFlagged(playerName);
     const nerd        = !flagged && isNerd(playerName);
-    const snapNerdIndices = snap.scores.reduce((acc, e, j) => {
-      if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(j);
-      return acc;
-    }, []);
-    const snapMultipleNerds = snapNerdIndices.length >= 2;
-    const snapBestNerdRank  = snapNerdIndices.length >= 1 ? Math.min(...snapNerdIndices.map(j => snap.ranks[j])) : Infinity;
     const topNerd     = nerd && rank === snapBestNerdRank;
     const rowCls      = flagged ? 'lb-row cheater' : getRowClass(rank);
     const rawScore    = entry.score !== undefined ? entry.score : 0;
@@ -901,6 +968,9 @@ function renderSnapshotLeaderboard(snap) {
   allScoresGlobal = savedScores;
   globalRanks     = savedRanks;
   totalScores     = savedTotal;
+
+  // Sync button visibility and labels
+  updateYesterdayBtn();
 }
 
 // Refresh only the leaderboard rows without hiding the section or jumping the page
@@ -1290,16 +1360,25 @@ function escapeHtml(str) {
 // ═══════════════════════════════════════════════════════════════════
 function renderLeaderboard() {
   const container = document.getElementById('lbRows');
+
+  // If cheaters are hidden, work with a filtered set and recomputed ranks
+  const displayScores = cheatersHidden
+    ? allScoresGlobal.filter(e => !isFlagged(stripDiscTag(e.playerName)))
+    : allScoresGlobal;
+  const displayRanks = cheatersHidden
+    ? computeTiedRanks(displayScores)
+    : globalRanks;
+
   // Gold badge: rank-1 nerd when 2+ nerds present; tied rank-1 nerds both get gold
-  const nerdIndices = allScoresGlobal.reduce((acc, e, i) => {
+  const nerdIndices = displayScores.reduce((acc, e, i) => {
     if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(i);
     return acc;
   }, []);
   const multipleNerds = nerdIndices.length >= 2;
-  const bestNerdRank  = nerdIndices.length >= 1 ? Math.min(...nerdIndices.map(i => globalRanks[i])) : Infinity;
-  container.innerHTML = allScoresGlobal.map((entry, i) => {
-    const rank        = globalRanks[i];
-    const rankDisplay = getRankDisplay(rank, allScoresGlobal, i);
+  const bestNerdRank  = nerdIndices.length >= 1 ? Math.min(...nerdIndices.map(i => displayRanks[i])) : Infinity;
+  container.innerHTML = displayScores.map((entry, i) => {
+    const rank        = displayRanks[i];
+    const rankDisplay = getRankDisplay(rank, displayScores, i);
     const rankCls     = getRankClass(rank);
     const playerName  = stripDiscTag(entry.playerName);
     const flagged     = isFlagged(playerName);
@@ -1331,8 +1410,16 @@ function renderLeaderboard() {
     `;
   }).join('');
 
+  const visibleCount = displayScores.length;
   document.getElementById('resultsCount').innerHTML =
-    `<span>${totalScores}</span> players on today's leaderboard`;
+    `<span>${visibleCount}</span> players on today's leaderboard`;
+
+  // Show/hide cheater filter button based on whether there are cheaters
+  const cheaterBtn = document.getElementById('cheaterFilterBtn');
+  if (cheaterBtn) {
+    const hasCheaters = allScoresGlobal.some(e => isFlagged(stripDiscTag(e.playerName)));
+    cheaterBtn.style.display = hasCheaters ? '' : 'none';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1539,6 +1626,11 @@ async function fetchAll(token) {
 async function autoLoadToken() {
   // Reset to today's view whenever refresh is triggered
   viewingYesterday = false;
+  cheatersHidden = false;
+  ['cheaterFilterBtn', 'cheaterFilterBtnYesterday'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) { btn.textContent = 'Remove Cheaters'; btn.classList.remove('showing'); }
+  });
   const banner = document.getElementById('yesterdayBanner');
   if (banner) banner.style.display = 'none';
   updateYesterdayBtn();
