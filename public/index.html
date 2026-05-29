@@ -456,10 +456,7 @@
 
   .refresh-btn:hover { border-color: var(--green-neon); color: var(--green-neon); }
 
-  .cheater-filter-btn { border-color: rgba(224,92,92,0.5); color: #e05c5c; }
-  .cheater-filter-btn:hover { border-color: #e05c5c; color: #e05c5c; background: rgba(224,92,92,0.08); }
-  .cheater-filter-btn.showing { border-color: rgba(46,207,170,0.5); color: var(--accent2); }
-  .cheater-filter-btn.showing:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(46,207,170,0.08); }
+
 
   .leaderboard {
     background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
@@ -665,13 +662,14 @@
       <div class="results-count" id="resultsCount"></div>
       <div id="todayViewBtns" class="btn-group">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
-        <button class="refresh-btn cheater-filter-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()" style="display:none">Remove Cheaters</button>
-        <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
+        <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">&#x21BB; Refresh</button>
       </div>
       <div id="yesterdayViewBtns" style="display:none;" class="btn-group">
-        <button class="refresh-btn cheater-filter-btn" id="cheaterFilterBtnYesterday" onclick="toggleCheaterFilter()" style="display:none">Remove Cheaters</button>
-        <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()" style="width:100%;">Today's Leaderboard</button>
+        <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()">Today's Leaderboard</button>
       </div>
+    </div>
+    <div id="cheaterFilterRow" style="display:none; text-align:center; margin-bottom:12px;">
+      <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()">Remove Cheaters</button>
     </div>
     <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:#e8833a;text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(232,131,58,0.2);">
       Viewing Yesterday's Leaderboard
@@ -786,43 +784,35 @@ function updateYesterdayBtn() {
   const yesterdayBtn      = document.getElementById('yesterdayBtn');
   const todayViewBtns     = document.getElementById('todayViewBtns');
   const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
+  const cheaterFilterRow  = document.getElementById('cheaterFilterRow');
   const cheaterBtn        = document.getElementById('cheaterFilterBtn');
-  const cheaterBtnYest    = document.getElementById('cheaterFilterBtnYesterday');
   if (!yesterdayBtn) return;
 
-  // Always keep both button labels in sync with the shared cheatersHidden state
-  [cheaterBtn, cheaterBtnYest].forEach(btn => {
-    if (!btn) return;
-    if (cheatersHidden) {
-      btn.textContent = 'Show Cheaters';
-      btn.classList.add('showing');
-    } else {
-      btn.textContent = 'Remove Cheaters';
-      btn.classList.remove('showing');
-    }
-  });
+  // Always keep button label in sync with shared cheatersHidden state
+  if (cheaterBtn) {
+    cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
+  }
 
   if (viewingYesterday) {
-    // Capture today row width before hiding, apply to yesterday container
     const w = todayViewBtns.offsetWidth;
     todayViewBtns.style.display     = 'none';
     yesterdayViewBtns.style.display = '';
     if (w > 0) yesterdayViewBtns.style.width = w + 'px';
-    // Show/hide yesterday cheater btn based on whether any flagged players are in snapshot
-    if (yesterdaySnapshot && yesterdaySnapshot.scores) {
-      const hasCheatersYest = yesterdaySnapshot.scores.some(e => isFlagged(stripDiscTag(e.playerName)));
-      if (cheaterBtnYest) cheaterBtnYest.style.display = hasCheatersYest ? '' : 'none';
+    // Show cheater row if snapshot has any flagged players
+    if (cheaterFilterRow) {
+      const hasCheaters = yesterdaySnapshot && yesterdaySnapshot.scores &&
+        yesterdaySnapshot.scores.some(e => isFlagged(stripDiscTag(e.playerName)));
+      cheaterFilterRow.style.display = hasCheaters ? '' : 'none';
     }
   } else {
-    // Today view: show normal row, hide yesterday view button
     yesterdayViewBtns.style.display = 'none';
     yesterdayViewBtns.style.width   = '';
     todayViewBtns.style.display     = '';
     yesterdayBtn.style.display      = yesterdaySnapshot ? '' : 'none';
-    // Show cheater btn only if any flagged players are on today's board
-    if (cheaterBtn) {
+    // Show cheater row if today's board has any flagged players
+    if (cheaterFilterRow) {
       const hasCheaters = allScoresGlobal.some(e => isFlagged(stripDiscTag(e.playerName)));
-      cheaterBtn.style.display = hasCheaters ? '' : 'none';
+      cheaterFilterRow.style.display = hasCheaters ? '' : 'none';
     }
   }
 }
@@ -831,18 +821,10 @@ function updateYesterdayBtn() {
 function toggleCheaterFilter() {
   cheatersHidden = !cheatersHidden;
 
-  // Update both possible buttons
-  ['cheaterFilterBtn', 'cheaterFilterBtnYesterday'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (!btn) return;
-    if (cheatersHidden) {
-      btn.textContent = 'Show Cheaters';
-      btn.classList.add('showing');
-    } else {
-      btn.textContent = 'Remove Cheaters';
-      btn.classList.remove('showing');
-    }
-  });
+  const cheaterBtn = document.getElementById('cheaterFilterBtn');
+  if (cheaterBtn) {
+    cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
+  }
 
   // Re-render whichever leaderboard is active
   if (viewingYesterday && yesterdaySnapshot) {
@@ -1413,13 +1395,6 @@ function renderLeaderboard() {
   const visibleCount = displayScores.length;
   document.getElementById('resultsCount').innerHTML =
     `<span>${visibleCount}</span> players on today's leaderboard`;
-
-  // Show/hide cheater filter button based on whether there are cheaters
-  const cheaterBtn = document.getElementById('cheaterFilterBtn');
-  if (cheaterBtn) {
-    const hasCheaters = allScoresGlobal.some(e => isFlagged(stripDiscTag(e.playerName)));
-    cheaterBtn.style.display = hasCheaters ? '' : 'none';
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1627,10 +1602,8 @@ async function autoLoadToken() {
   // Reset to today's view whenever refresh is triggered
   viewingYesterday = false;
   cheatersHidden = false;
-  ['cheaterFilterBtn', 'cheaterFilterBtnYesterday'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) { btn.textContent = 'Remove Cheaters'; btn.classList.remove('showing'); }
-  });
+  const cheaterBtn = document.getElementById('cheaterFilterBtn');
+  if (cheaterBtn) { cheaterBtn.textContent = 'Remove Cheaters'; }
   const banner = document.getElementById('yesterdayBanner');
   if (banner) banner.style.display = 'none';
   updateYesterdayBtn();
