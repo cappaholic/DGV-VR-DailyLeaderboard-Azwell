@@ -435,14 +435,20 @@
   @media (max-width: 600px) {
     .controls-row { flex-wrap: wrap; justify-content: center; }
     .controls-row .results-count { width: 100%; text-align: center; order: 0; }
-    .btn-group, #yesterdayViewBtns {
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-      gap: 10px;
+    #todayViewBtns {
+      display: contents; /* children become direct flex items of controls-row */
     }
-    #todayViewBtns    { order: 1; }
-    #yesterdayViewBtns { order: 1; }
+    #todayViewBtns #yesterdayBtn {
+      order: 1;
+      width: 100%;
+      text-align: center;
+    }
+    #refreshBtnWrap {
+      order: 3;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
     #cheaterFilterCenter {
       position: static !important;
       transform: none !important;
@@ -451,11 +457,13 @@
       justify-content: center;
       order: 2;
     }
-    #refreshBtnWrap {
-      order: 3;
+    #yesterdayViewBtns {
+      order: 1;
       width: 100%;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
     }
   }
 
@@ -681,8 +689,8 @@
       </div>
       <div id="todayViewBtns" class="btn-group">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
+        <div id="refreshBtnWrap"><button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button></div>
       </div>
-      <div id="refreshBtnWrap"><button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button></div>
       <div id="yesterdayViewBtns" style="display:none;">
         <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()" style="width:100%;">Today's Leaderboard</button>
       </div>
