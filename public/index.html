@@ -662,13 +662,14 @@
       <div class="results-count" id="resultsCount"></div>
       <div id="todayViewBtns" class="btn-group">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
-        <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()" style="display:none">Remove Cheaters</button>
         <button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button>
       </div>
-      <div id="yesterdayViewBtns" style="display:none;" class="btn-group">
-        <button class="refresh-btn" id="cheaterFilterBtnYesterday" onclick="toggleCheaterFilter()" style="display:none">Remove Cheaters</button>
+      <div id="yesterdayViewBtns" style="display:none;">
         <button class="refresh-btn" id="todayBtnRightBtn" onclick="showTodayLeaderboard()" style="width:100%;">Today's Leaderboard</button>
       </div>
+    </div>
+    <div id="cheaterFilterRow" style="display:none; text-align:center; margin-bottom:12px;">
+      <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()">Remove Cheaters</button>
     </div>
     <div id="yesterdayBanner" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:#e8833a;text-transform:uppercase;margin-bottom:10px;text-align:center;padding:6px 0;border-bottom:1px solid rgba(232,131,58,0.2);">
       Viewing Yesterday's Leaderboard
@@ -780,36 +781,38 @@ async function loadYesterdaySnapshot() {
 }
 
 function updateYesterdayBtn() {
-  const yesterdayBtn       = document.getElementById('yesterdayBtn');
-  const todayViewBtns      = document.getElementById('todayViewBtns');
-  const yesterdayViewBtns  = document.getElementById('yesterdayViewBtns');
-  const cheaterBtn         = document.getElementById('cheaterFilterBtn');
-  const cheaterBtnYest     = document.getElementById('cheaterFilterBtnYesterday');
+  const yesterdayBtn      = document.getElementById('yesterdayBtn');
+  const todayViewBtns     = document.getElementById('todayViewBtns');
+  const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
+  const cheaterFilterRow  = document.getElementById('cheaterFilterRow');
+  const cheaterBtn        = document.getElementById('cheaterFilterBtn');
   if (!yesterdayBtn) return;
 
-  // Sync both button labels to shared state
-  [cheaterBtn, cheaterBtnYest].forEach(btn => {
-    if (btn) btn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
-  });
+  // Keep button label synced to shared state
+  if (cheaterBtn) {
+    cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
+  }
 
   if (viewingYesterday) {
     const w = todayViewBtns.offsetWidth;
     todayViewBtns.style.display     = 'none';
     yesterdayViewBtns.style.display = '';
     if (w > 0) yesterdayViewBtns.style.width = w + 'px';
-    if (cheaterBtnYest) {
+    // Show cheater row if yesterday's snapshot has flagged players
+    if (cheaterFilterRow) {
       const hasCheaters = yesterdaySnapshot && yesterdaySnapshot.scores &&
         yesterdaySnapshot.scores.some(e => isFlagged(stripDiscTag(e.playerName)));
-      cheaterBtnYest.style.display = hasCheaters ? '' : 'none';
+      cheaterFilterRow.style.display = hasCheaters ? '' : 'none';
     }
   } else {
     yesterdayViewBtns.style.display = 'none';
     yesterdayViewBtns.style.width   = '';
     todayViewBtns.style.display     = '';
     yesterdayBtn.style.display      = yesterdaySnapshot ? '' : 'none';
-    if (cheaterBtn) {
+    // Show cheater row if today's board has flagged players
+    if (cheaterFilterRow) {
       const hasCheaters = allScoresGlobal.some(e => isFlagged(stripDiscTag(e.playerName)));
-      cheaterBtn.style.display = hasCheaters ? '' : 'none';
+      cheaterFilterRow.style.display = hasCheaters ? '' : 'none';
     }
   }
 }
@@ -818,10 +821,8 @@ function updateYesterdayBtn() {
 function toggleCheaterFilter() {
   cheatersHidden = !cheatersHidden;
 
-  ['cheaterFilterBtn', 'cheaterFilterBtnYesterday'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) btn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
-  });
+  const cheaterBtn = document.getElementById('cheaterFilterBtn');
+  if (cheaterBtn) cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
 
   if (viewingYesterday && yesterdaySnapshot) {
     renderSnapshotLeaderboard(yesterdaySnapshot);
@@ -1598,10 +1599,8 @@ async function autoLoadToken() {
   // Reset to today's view whenever refresh is triggered
   viewingYesterday = false;
   cheatersHidden = false;
-  ['cheaterFilterBtn', 'cheaterFilterBtnYesterday'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) btn.textContent = 'Remove Cheaters';
-  });
+  const cheaterBtn = document.getElementById('cheaterFilterBtn');
+  if (cheaterBtn) cheaterBtn.textContent = 'Remove Cheaters';
   const banner = document.getElementById('yesterdayBanner');
   if (banner) banner.style.display = 'none';
   updateYesterdayBtn();
