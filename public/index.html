@@ -268,6 +268,16 @@
     font-family: 'DM Mono', monospace;
   }
   .history-modal.yesterday-mode { border-top-color: #e8833a; }
+  .history-cheater-btn {
+    width: 100%; margin-top: 10px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 7px 0; border-radius: 4px; cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .history-cheater-btn:hover { border-color: var(--muted); color: var(--white); }
+  .history-cheater-btn.active { border-color: #e05c5c; color: #e05c5c; }
   .history-modal-name {
     font-family: 'DM Sans', sans-serif;
     font-size: 16px; font-weight: 500;
@@ -1541,6 +1551,7 @@ function renderLeaderboard() {
 let historyData       = null;   // full parsed history.json array
 let historyLoaded     = false;
 let currentHistoryTab = 7;
+let historyExcludeCheaters = false;
 
 async function loadHistoryData() {
   if (historyLoaded) return;
@@ -1558,6 +1569,7 @@ function openHistoryModal(playerName) {
   const el = document.getElementById('historyPlayerName');
   el.textContent = playerName;
   el.dataset.rawName = playerName;
+  historyExcludeCheaters = false;
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
   if (isFlagged(playerName)) {
@@ -1607,14 +1619,27 @@ function renderHistoryContent(playerName, days) {
     el.innerHTML = `<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
     return;
   }
-  const avgRank  = played.reduce((s, d) => {
-    const p = d.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-    return s + p.rank;
-  }, 0) / played.length;
-  const avgVsPar = played.reduce((s, d) => {
-    const p = d.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-    return s + p.vsPar;
-  }, 0) / played.length;
+
+  // Compute stats, optionally re-ranking without cheaters
+  let totalRank = 0;
+  let totalVsPar = 0;
+  played.forEach(day => {
+    const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+    totalVsPar += me.vsPar;
+    if (historyExcludeCheaters) {
+      // Re-rank: sort non-cheater players by vsPar, find this player's position
+      const clean = day.players
+        .filter(p => !isFlagged(stripDiscTag(p.name)))
+        .sort((a, b) => a.vsPar - b.vsPar);
+      const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+      totalRank += pos >= 0 ? pos + 1 : me.rank;
+    } else {
+      totalRank += me.rank;
+    }
+  });
+
+  const avgRank  = totalRank  / played.length;
+  const avgVsPar = totalVsPar / played.length;
 
   const vsParDisplay = avgVsPar === 0 ? 'E'
     : (avgVsPar > 0 ? '+' : '') + avgVsPar.toFixed(1);
@@ -1623,6 +1648,9 @@ function renderHistoryContent(playerName, days) {
   // Floor avgRank to nearest lower whole number for color matching
   const flooredRank = Math.floor(avgRank);
   const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : 'rank-default';
+
+  const btnLabel = historyExcludeCheaters ? 'Cheaters Excluded' : 'Include Cheaters';
+  const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
   el.innerHTML = `
     <div class="history-stat-row">
@@ -1636,7 +1664,15 @@ function renderHistoryContent(playerName, days) {
       </div>
     </div>
     <div class="history-played">Played ${played.length} of ${days} days</div>
+    <button class="${btnCls}" onclick="toggleHistoryCheaters()">${btnLabel}</button>
   `;
+}
+
+function toggleHistoryCheaters() {
+  historyExcludeCheaters = !historyExcludeCheaters;
+  const nameEl = document.getElementById('historyPlayerName');
+  const name = nameEl.dataset.rawName || nameEl.textContent;
+  renderHistoryContent(name, currentHistoryTab);
 }
 
 // ═══════════════════════════════════════════════════════════════════
