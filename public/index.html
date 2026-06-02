@@ -625,23 +625,11 @@
     border: 1px solid var(--border);
     border-top: 2px solid var(--accent2);
     border-radius: 12px;
-    width: min(580px, 94vw);
+    width: min(860px, 96vw);
     overflow: hidden;
     position: relative;
   }
   .hole-modal.yesterday-mode { border-top-color: #e8833a; }
-
-  .hole-modal-close {
-    position: absolute; top: 10px; right: 12px;
-    background: none; border: 1px solid var(--border);
-    color: var(--muted); border-radius: 4px;
-    width: 28px; height: 28px;
-    font-size: 14px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: color 0.15s, border-color 0.15s;
-    z-index: 2;
-  }
-  .hole-modal-close:hover { color: var(--red); border-color: var(--red); }
 
   .hole-img-wrap {
     position: relative;
@@ -649,7 +637,7 @@
     line-height: 0;
   }
   .hole-img-wrap img {
-    width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
+    width: 100%; aspect-ratio: 16/9; object-fit: contain; display: block;
   }
   .hole-img-placeholder {
     width: 100%; aspect-ratio: 16/9;
@@ -660,7 +648,7 @@
     letter-spacing: 1px; text-transform: uppercase;
   }
 
-  /* Side nav arrows — sit outside the image, inside the modal */
+  /* Side nav arrows */
   .hole-nav-row {
     display: flex; align-items: center; gap: 0;
   }
@@ -679,20 +667,20 @@
   .hole-caption {
     flex: 1;
     padding: 12px 16px;
-    display: flex; flex-direction: column; gap: 2px;
-    min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 0; text-align: center;
   }
   .hole-caption-course {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px; color: var(--white); line-height: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hole-caption-hole {
     font-family: 'DM Mono', monospace;
     font-size: 11px; color: var(--accent2);
     letter-spacing: 1px; text-transform: uppercase;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .hole-modal.yesterday-mode .hole-caption-course { color: #e8833a; }
-  .hole-caption-hole {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 20px; color: var(--white); line-height: 1;
-  }
+  .hole-modal.yesterday-mode .hole-caption-hole { color: #e8833a; }
   .hole-caption-par {
     font-family: 'DM Mono', monospace;
     font-size: 10px; color: var(--muted); letter-spacing: 1px;
@@ -700,7 +688,7 @@
 
   .hole-dots {
     display: flex; justify-content: center; gap: 6px;
-    padding: 10px 0 12px;
+    padding: 10px 0 0;
   }
   .hole-dot {
     width: 7px; height: 7px; border-radius: 50%;
@@ -709,6 +697,17 @@
   }
   .hole-dot.active { background: var(--accent2); }
   .hole-modal.yesterday-mode .hole-dot.active { background: #e8833a; }
+
+  .hole-close-btn {
+    display: block; width: calc(100% - 32px); margin: 10px 16px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 4px;
+    padding: 7px 0; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .hole-close-btn:hover { color: var(--white); border-color: var(--white); }
 </style>
 </head>
 <body>
@@ -1786,7 +1785,6 @@ autoLoadToken();
   <!-- ── Hole slideshow overlay ── -->
   <div class="hole-overlay" id="holeOverlay" onclick="handleHoleOverlayClick(event)">
     <div class="hole-modal" id="holeModal">
-      <button class="hole-modal-close" onclick="closeHoleSlideshow()" aria-label="Close">&#10005;</button>
       <div id="holeImgWrap" class="hole-img-wrap"></div>
       <div class="hole-nav-row">
         <button class="hole-nav-btn" id="holePrevBtn" onclick="changeHoleSlide(-1)">&#8249;</button>
@@ -1798,6 +1796,7 @@ autoLoadToken();
         <button class="hole-nav-btn" id="holeNextBtn" onclick="changeHoleSlide(1)">&#8250;</button>
       </div>
       <div class="hole-dots" id="holeDots"></div>
+      <button class="hole-close-btn" onclick="closeHoleSlideshow()">Close</button>
     </div>
   </div>
 
