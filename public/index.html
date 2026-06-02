@@ -1627,12 +1627,20 @@ function renderHistoryContent(playerName, days) {
     const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
     totalVsPar += me.vsPar;
     if (historyExcludeCheaters) {
-      // Re-rank: sort non-cheater players by vsPar, find this player's position
+      // Re-rank: remove cheaters, sort by score ascending, apply tied ranking
       const clean = day.players
         .filter(p => !isFlagged(stripDiscTag(p.name)))
-        .sort((a, b) => a.vsPar - b.vsPar);
+        .sort((a, b) => a.score - b.score);
+      const reranked = [];
+      for (let i = 0; i < clean.length; i++) {
+        if (i > 0 && clean[i].score === clean[i - 1].score) {
+          reranked.push(reranked[i - 1]);
+        } else {
+          reranked.push(i + 1);
+        }
+      }
       const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-      totalRank += pos >= 0 ? pos + 1 : me.rank;
+      totalRank += pos >= 0 ? reranked[pos] : me.rank;
     } else {
       totalRank += me.rank;
     }
