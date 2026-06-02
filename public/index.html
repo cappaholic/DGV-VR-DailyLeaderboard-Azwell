@@ -1880,9 +1880,15 @@ autoLoadToken();
     const abbr   = COURSE_ABBR[h.course] || 'XX';
     const imgSrc = 'holes/' + abbr + h.holeNum + '.png';
 
-    document.getElementById('holeImgWrap').innerHTML =
-      '<img src="' + imgSrc + '" alt="' + h.course + ' Hole ' + h.holeNum + '" ' +
-      'onerror="this.parentNode.innerHTML='<div class=hole-img-placeholder>Photo coming soon</div>'">';
+    const img = document.createElement('img');
+    img.src = imgSrc;
+    img.alt = h.course + ' Hole ' + h.holeNum;
+    img.onerror = function() {
+      this.parentNode.innerHTML = '<div class="hole-img-placeholder">Photo coming soon</div>';
+    };
+    const wrap = document.getElementById('holeImgWrap');
+    wrap.innerHTML = '';
+    wrap.appendChild(img);
 
     document.getElementById('holeCaptionCourse').textContent = h.course;
     document.getElementById('holeCaptionHole').textContent   = 'Hole ' + h.holeNum;
