@@ -267,6 +267,7 @@
     width: 360px; max-width: 92vw;
     font-family: 'DM Mono', monospace;
   }
+  .history-modal.yesterday-mode { border-top-color: #e8833a; }
   .history-modal-name {
     font-family: 'DM Sans', sans-serif;
     font-size: 16px; font-weight: 500;
@@ -1558,6 +1559,7 @@ function openHistoryModal(playerName) {
   el.textContent = playerName;
   el.dataset.rawName = playerName;
   document.getElementById('historyOverlay').classList.add('open');
+  document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
   if (isFlagged(playerName)) {
     document.getElementById('tab7').classList.remove('active');
     document.getElementById('tab30').classList.remove('active');
