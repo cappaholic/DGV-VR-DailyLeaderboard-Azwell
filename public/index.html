@@ -633,16 +633,20 @@
   }
   .hole-modal.yesterday-mode { border-top-color: #e8833a; }
 
-  /* Image sits immediately below the top border — no gap */
+  /* Small top padding so rounded corners don't clip image */
   .hole-img-wrap {
     position: relative;
-    background: var(--surface);
+    background: var(--card);
     line-height: 0;
     flex-shrink: 0;
-    margin-top: 0;
+    padding-top: 8px;
   }
   .hole-img-wrap img {
     width: 100%; display: block; height: auto;
+    transition: opacity 0.2s ease;
+  }
+  .hole-img-wrap img.fading {
+    opacity: 0;
   }
   .hole-img-placeholder {
     width: 100%; aspect-ratio: 16/9;
@@ -653,22 +657,24 @@
     letter-spacing: 1px; text-transform: uppercase;
   }
 
-  /* Caption + arrows sit in one compact row right below image */
+  /* Caption + arrows */
   .hole-nav-row {
     display: flex; align-items: center; gap: 0;
     padding: 0;
+    min-height: 56px;
   }
   .hole-nav-btn {
     background: transparent;
     border: none; color: var(--muted);
-    font-size: 26px; cursor: pointer;
-    padding: 2px 16px;
-    transition: color 0.15s;
+    font-size: 36px; cursor: pointer;
+    padding: 0 20px;
+    transition: color 0.15s, opacity 0.15s;
     flex-shrink: 0;
     line-height: 1;
+    display: flex; align-items: center; align-self: stretch;
   }
   .hole-nav-btn:hover:not(:disabled) { color: var(--white); }
-  .hole-nav-btn:disabled { opacity: 0.2; cursor: default; }
+  .hole-nav-btn:disabled { opacity: 0; cursor: default; pointer-events: none; }
 
   .hole-caption {
     flex: 1;
@@ -1864,12 +1870,12 @@ autoLoadToken();
 
   function changeHoleSlide(dir) {
     slideshowCursor = Math.max(0, Math.min(slideshowHoles.length - 1, slideshowCursor + dir));
-    updateHoleSlide();
+    updateHoleSlide(true);
   }
 
   function jumpHoleSlide(i) {
     slideshowCursor = i;
-    updateHoleSlide();
+    updateHoleSlide(true);
   }
 
   function buildHoleDots() {
@@ -1878,20 +1884,31 @@ autoLoadToken();
     ).join('');
   }
 
-  function updateHoleSlide() {
+  function updateHoleSlide(animate) {
     const h      = slideshowHoles[slideshowCursor];
     const abbr   = COURSE_ABBR[h.course] || 'XX';
     const imgSrc = 'holes/' + abbr + h.holeNum + '.png';
 
-    const img = document.createElement('img');
-    img.src = imgSrc;
-    img.alt = h.course + ' Hole ' + h.holeNum;
-    img.onerror = function() {
-      this.parentNode.innerHTML = '<div class="hole-img-placeholder">Photo coming soon</div>';
-    };
     const wrap = document.getElementById('holeImgWrap');
-    wrap.innerHTML = '';
-    wrap.appendChild(img);
+    const existing = wrap.querySelector('img');
+
+    function setImage() {
+      const img = document.createElement('img');
+      img.src = imgSrc;
+      img.alt = h.course + ' Hole ' + h.holeNum;
+      img.onerror = function() {
+        wrap.innerHTML = '<div class="hole-img-placeholder">Photo coming soon</div>';
+      };
+      wrap.innerHTML = '';
+      wrap.appendChild(img);
+    }
+
+    if (animate && existing) {
+      existing.classList.add('fading');
+      setTimeout(setImage, 200);
+    } else {
+      setImage();
+    }
 
     document.getElementById('holeCaptionNum').textContent = slideshowCursor + 1;
 
