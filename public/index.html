@@ -1,140 +1,3 @@
-
-Disc Golf Valley VR
-/
-Claude finished the response
-Once I have photos of every hole, will all 68 photos need to be uploaded to GitHub? If not, how will they be added/need to be stored?
-
-10:02 AM
-Could you give me a bit more context?
-
-
-Relevant chats
-Relevant chats
-Great, I have the context now. This is about the golf leaderboard app we've been building together.
-
-No, you won't need to upload all 68 photos to GitHub directly — though you can if you prefer. Here are your options:
-
-Option 1: Upload directly to the GitHub repo (simplest) Put all 68 photos in public/holes/ in your repo (e.g. public/holes/crowsnest_9.jpg). The app references them as relative paths, so they just work. The downside is it bloats your repo size with binary files, but for 68 golf hole images it's likely manageable.
-
-Option 2: Host them externally (cleaner long-term) Upload the photos somewhere like:
-
-GitHub Releases — attach them as release assets; free, stays in GitHub, doesn't bloat the main repo
-Cloudflare R2 or AWS S3 — free tiers available, images served via URL
-Imgur or similar — quick and free but less control
-The app would then reference full URLs instead of relative paths.
-
-My recommendation: Option 1 for your use case. You have 68 images for a small personal app, and keeping everything in one repo is simple and maintainable. GitHub handles it fine, and you won't need to manage a separate hosting service.
-
-The naming convention we already settled on was public/holes/coursename_holenumber.ext (e.g. crowsnest_9.jpg). Once you know what format the images come out of the game files as, just drop them all in that folder and push — then we can wire up the slideshow.
-
-1780362042600_image.png
-Ok, I have the pics and I'm ready to do this. 
-There are 17-18 I need to edit, but I can replace those that need fixed when I get them.
-I can upload to GitHub in the folder you stated, but the naming convention for the pics is as follows:
-
-2 letters for each course, followed by hole number.
-Examples - BT1 for Blueberry Thicket hole 1, LS3 for Lakeside hole 3
-See attached photo for all course abbreviations
-9:01 PM
-The photos look great, and the naming convention is clear! Here's what I can see from the screenshot:
-
-BT = Blueberry Thicket (BT1–BT9)
-CN = Crow's Nest (CN1–CN9)
-GG = Grizzly Gulch (GG1–GG9)
-HW = Harrowing Woods (HW1–HW9)
-LS = Lakeside (LS1–LS9)
-OH = Oak Hill (OH1–OH9)
-SG = Sunshine Glade (SG1–SG5, so fewer holes?)
-WF = Windswept Fields (WF1–WF9)
-A couple of quick questions before you upload:
-
-SG — I only see SG1–SG5 in the screenshot. Is Sunshine Glade a shorter course, or are the rest just not pictured yet?
-The "Fixed" folder — there's a folder labeled "Fixed" in the top left. Are those replacement files for the 17–18 that need editing, or something else?
-Once you drop all the .png files into public/holes/ in your GitHub repo, I'll update the slideshow code to map each course abbreviation to its full name and wire up the image paths. The naming is even cleaner than what we originally planned — this will be simple to implement!
-
-
-index (10).html
-html
-
-Sunshine Glade only has 5 holes. All other courses have 8.
-Ignore the Fixed folder. That is where I am placing the incorrect pics as I fix them.
-You can use the attached html as the baseline as it is the one you gave me today when we fixed the history pop-up box.
-
-9:04 PM
-
-Relevant chats
-Relevant chats
-Good, I have all the context I need. Let me read the uploaded HTML file and build the slideshow into it.
-
-
-Viewed 5 files
-Viewed 5 files
-Now I have everything I need. Let me build the complete updated file with the slideshow added.
-
-
-Copy uploaded file to working directory
-Copy uploaded file to working directory
-Now I'll add the CSS for the slideshow, the View Holes button in the layout strip, the slideshow overlay HTML, and the JS functions.
-
-
-Edited 3 files
-Edited 3 files
-Now add the slideshow overlay HTML before the closing </body>:
-
-
-Ran 3 commands, edited 2 files, viewed 2 files
-Ran 3 commands, edited 2 files, viewed 2 files
-Everything is wired up correctly. Now copy to outputs:
-
-
-Ran a command, read a file
-Ran a command, read a file
-Here's what was added:
-
-View Holes button — sits in the top-right of the layout strip header, next to the par badge. It picks up the amber color on hover when you're in yesterday mode.
-
-Slideshow overlay — darkened backdrop, click outside to close, ✕ button in the corner. The image fills the top 16:9 area, and the nav arrows are on the sides of the caption row (so they don't cover the photo).
-
-Caption order — Course → Hole → Par, exactly as requested.
-
-Works for both views — when you're in today's view it uses todayLayout; when in yesterday's view it generates the layout from yesterdaySnapshot.seed. The modal border also turns amber in yesterday mode to match.
-
-Mobile — left/right swipe on the image navigates holes, and the dots at the bottom are tappable to jump directly to any slide.
-
-Image paths — loads from holes/BT1.png, holes/CN3.png, etc. (your exact naming). If a photo isn't there yet, it shows "Photo coming soon" gracefully. Once you upload all the images to public/holes/ and push, everything will just work.
-
-
-Index
-Code · HTML 
-Ok, one more thiing.... how do I create a folder in GitHub to upload the photos?
-
-9:09 PM
-You don't actually create folders directly in GitHub — folders only exist when they contain files. The easiest way to create the holes/ folder and upload your photos at the same time:
-
-Go to your repo on GitHub
-Click Add file → Upload files
-Drag all 68 photos into the upload area
-In the file path shown at the top, you'll see the filenames listed — but before committing, type holes/ in front of the filenames in the destination path field...
-Actually, the simplest trick: drag your photos in, then in the commit area there's no folder option. Instead, do this:
-
-Click Add file → Create new file
-In the filename box, type holes/ — GitHub will automatically create the folder as you type the slash
-Then type a placeholder filename like .gitkeep and commit it
-Now the holes/ folder exists — go into it and use Add file → Upload files to upload all your photos there
-Or even easier — if you have the photos in a folder called holes on your computer, you can drag the entire folder into the GitHub upload area and it will create the folder structure automatically.
-
-
-
-
-
-
-
-
-Claude is AI and can make mistakes. Please double-check responses.
-
-
-raw
-Index · HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -160,7 +23,7 @@ Index · HTML
     --red:          #e05c5c;
     --accent2:      #2ecfaa;
     --purple:       #9b6fd4;
- 
+
     /* ── Course identity colors ── */
     --course-sunshine:   #F0DF00;   /* Sunshine Glade    – Bright Yellow  */
     --course-blueberry:  #6B5FE8;   /* Blueberry Thicket – Blueberry      */
@@ -171,9 +34,9 @@ Index · HTML
     --course-crows:      #A8B4BC;   /* Crow's Nest       – Steel Gray      */
     --course-grizzly:    #C26F21;   /* Grizzly Gulch     – Deep Orange     */
   }
- 
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
- 
+
   body {
     background: var(--green-deep);
     color: var(--white);
@@ -182,16 +45,16 @@ Index · HTML
     overflow-x: hidden;
     position: relative;
   }
- 
- 
- 
+
+
+
   .container {
     max-width: 980px;
     margin: 0 auto;
     padding: 40px 24px 64px;
     position: relative; z-index: 1;
   }
- 
+
   /* ── Header ── */
   .header { text-align: center; margin-bottom: 32px; }
   .header-logo {
@@ -204,7 +67,7 @@ Index · HTML
     font-size: 12px; letter-spacing: 3px; color: var(--muted);
     text-transform: uppercase; margin-top: 0;
   }
- 
+
   /* ── Daily window + countdown ── */
   .daily-window {
     display: flex; align-items: center; justify-content: space-between;
@@ -235,7 +98,7 @@ Index · HTML
     font-family: 'Bebas Neue', sans-serif; font-size: 26px;
     color: var(--border); padding-bottom: 12px; line-height: 1;
   }
- 
+
   /* ── Layout strip (seed + horizontal courses) ── */
   .layout-strip {
     background: var(--card);
@@ -248,7 +111,7 @@ Index · HTML
   }
   .layout-strip.show { display: block; }
   .layout-strip.yesterday-mode { border-top-color: #e8833a; }
- 
+
   .layout-top-row {
     display: flex;
     align-items: center;
@@ -281,7 +144,7 @@ Index · HTML
     color: var(--muted); text-transform: uppercase;
     margin-left: 4px; align-self: flex-end; margin-bottom: 3px;
   }
- 
+
   /* Horizontal course row */
   .courses-row {
     display: grid;
@@ -289,7 +152,7 @@ Index · HTML
     gap: 10px;
   }
   @media (max-width: 600px) { .courses-row { grid-template-columns: 1fr; } }
- 
+
   .course-block {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -350,7 +213,7 @@ Index · HTML
     padding: 2px 8px; cursor: pointer; transition: color 0.2s, border-color 0.2s;
   }
   .dist-toggle-btn:hover { color: var(--white); border-color: var(--white); }
- 
+
   /* ── 9-Hole Scorecard ── */
   .scorecard-row {
     display: grid;
@@ -360,7 +223,7 @@ Index · HTML
   @media (max-width: 600px) {
     .scorecard-row { grid-template-columns: repeat(3, 1fr); }
   }
- 
+
   .scorecard-pip {
     background: rgba(0,0,0,0.35);
     border: 1px solid var(--pip-color, var(--border));
@@ -389,7 +252,7 @@ Index · HTML
     font-size: 9px; color: var(--muted);
     display: block; line-height: 1; margin-top: 3px;
   }
- 
+
   /* ── Player history modal ── */
   .history-overlay {
     display: none; position: fixed; inset: 0;
@@ -470,7 +333,7 @@ Index · HTML
     transition: color 0.15s, border-color 0.15s;
   }
   .history-close-btn:hover { color: var(--white); border-color: var(--white); }
- 
+
   /* ── Config card ── */
   .card {
     background: var(--card);
@@ -500,21 +363,21 @@ Index · HTML
     margin-top: 14px;
   }
   .collapsible-body.collapsed { max-height: 0; opacity: 0; margin-top: 0; }
- 
+
   .config-grid {
     display: grid;
     grid-template-columns: 1fr 200px;
     gap: 12px; align-items: end;
   }
   @media (max-width: 600px) { .config-grid { grid-template-columns: 1fr; } }
- 
+
   .field-label {
     font-family: 'DM Mono', monospace;
     font-size: 10px; letter-spacing: 1px;
     color: var(--muted); text-transform: uppercase; margin-bottom: 6px;
   }
   .token-row { display: flex; gap: 10px; }
- 
+
   input[type="password"], input[type="number"], input[type="text"] {
     width: 100%;
     background: var(--green-deep);
@@ -530,7 +393,7 @@ Index · HTML
   input::placeholder { color: var(--muted); }
   input[type="number"] { text-align: center; font-size: 18px; font-weight: 500; }
   input[readonly] { color: var(--accent2); cursor: default; border-color: rgba(232,200,50,0.25); }
- 
+
   .btn {
     background: var(--green-bright); color: var(--white);
     border: none; border-radius: 8px;
@@ -542,11 +405,11 @@ Index · HTML
   .btn:hover { background: var(--green-neon); color: var(--green-deep); transform: translateY(-1px); }
   .btn:active { transform: translateY(0); }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
- 
+
   .hint { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
   .hint code { color: var(--green-neon); font-family: 'DM Mono', monospace; }
   .hint .seed-status { color: var(--accent2); }
- 
+
   /* ── Status bar ── */
   .status-bar {
     display: none; align-items: center; gap: 8px;
@@ -562,7 +425,7 @@ Index · HTML
     border: 2px solid var(--border); border-top-color: var(--green-neon);
     border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
   }
- 
+
   /* ── Leaderboard ── */
   .controls-row {
     display: flex; align-items: center; justify-content: space-between;
@@ -608,7 +471,7 @@ Index · HTML
     }
     #todayBtnRightBtn { width: auto !important; }
   }
- 
+
   .results-count { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
   .results-count span { color: var(--accent2); }
   .refresh-btn {
@@ -619,11 +482,11 @@ Index · HTML
     text-transform: uppercase; letter-spacing: 1px;
     white-space: nowrap;
   }
- 
+
   .refresh-btn:hover { border-color: var(--green-neon); color: var(--green-neon); }
- 
- 
- 
+
+
+
   .leaderboard {
     background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
   }
@@ -640,7 +503,7 @@ Index · HTML
   }
   .lb-header span:nth-child(3),
   .lb-header span:nth-child(4) { text-align: right; }
- 
+
   .lb-row {
     display: grid;
     grid-template-columns: 64px 1fr 100px 100px;
@@ -697,19 +560,19 @@ Index · HTML
   @media (max-width: 600px) {
     .nerd-badge { width: 120px; max-width: 60%; }
   }
- 
+
   .rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; color: var(--muted); text-align: center; }
   .rank.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
   .rank.silver { color: var(--silver); }
   .rank.bronze { color: var(--bronze); }
- 
+
   .player-name {
     font-size: 14px; font-weight: 500; color: var(--white);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
   }
- 
+
   .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; align-self: stretch; }
- 
+
   @media (max-width: 600px) {
     .lb-header, .lb-row { grid-template-columns: 48px 1fr 72px 72px; padding: 10px 12px; align-items: end; }
     .lb-row .score-cell { justify-content: flex-end; }
@@ -721,7 +584,7 @@ Index · HTML
   .score-vs-par.even    { color: var(--white); }
   .score-vs-par.unknown { color: var(--muted); font-size: 18px; }
   .score-raw { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); text-align: right; margin-top: 1px; display: block; }
- 
+
   /* ── Empty / Footer ── */
   .empty-state { text-align: center; padding: 64px 24px; color: var(--muted); }
   .empty-state .big-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
@@ -735,7 +598,7 @@ Index · HTML
     .footer { display: flex; flex-direction: column; gap: 6px; }
     .footer .footer-sep { display: none; }
   }
- 
+
   /* ── View Holes button ── */
   .view-holes-btn {
     font-family: 'DM Mono', monospace;
@@ -748,7 +611,7 @@ Index · HTML
   }
   .view-holes-btn:hover { color: var(--accent2); border-color: var(--accent2); }
   .layout-strip.yesterday-mode .view-holes-btn:hover { color: #e8833a; border-color: #e8833a; }
- 
+
   /* ── Hole slideshow overlay ── */
   .hole-overlay {
     display: none; position: fixed; inset: 0;
@@ -756,7 +619,7 @@ Index · HTML
     align-items: center; justify-content: center;
   }
   .hole-overlay.open { display: flex; }
- 
+
   .hole-modal {
     background: var(--card);
     border: 1px solid var(--border);
@@ -767,7 +630,7 @@ Index · HTML
     position: relative;
   }
   .hole-modal.yesterday-mode { border-top-color: #e8833a; }
- 
+
   .hole-modal-close {
     position: absolute; top: 10px; right: 12px;
     background: none; border: 1px solid var(--border);
@@ -779,7 +642,7 @@ Index · HTML
     z-index: 2;
   }
   .hole-modal-close:hover { color: var(--red); border-color: var(--red); }
- 
+
   .hole-img-wrap {
     position: relative;
     background: var(--surface);
@@ -796,7 +659,7 @@ Index · HTML
     font-size: 11px; color: var(--muted);
     letter-spacing: 1px; text-transform: uppercase;
   }
- 
+
   /* Side nav arrows — sit outside the image, inside the modal */
   .hole-nav-row {
     display: flex; align-items: center; gap: 0;
@@ -812,7 +675,7 @@ Index · HTML
   }
   .hole-nav-btn:hover:not(:disabled) { color: var(--white); background: rgba(9,22,34,0.95); }
   .hole-nav-btn:disabled { opacity: 0.2; cursor: default; }
- 
+
   .hole-caption {
     flex: 1;
     padding: 12px 16px;
@@ -834,7 +697,7 @@ Index · HTML
     font-family: 'DM Mono', monospace;
     font-size: 10px; color: var(--muted); letter-spacing: 1px;
   }
- 
+
   .hole-dots {
     display: flex; justify-content: center; gap: 6px;
     padding: 10px 0 12px;
@@ -850,7 +713,7 @@ Index · HTML
 </head>
 <body>
 <div class="container">
- 
+
   <!-- ── Header ── -->
   <div class="header">
     <img src="DGVR_Logo.png" alt="Disc Golf Valley VR" class="header-logo"/>
@@ -884,7 +747,7 @@ Index · HTML
       </svg>
     </div>
   </div>
- 
+
   <!-- ── Daily window + countdown ── -->
   <div class="daily-window">
     <div>
@@ -908,7 +771,7 @@ Index · HTML
       </div>
     </div>
   </div>
- 
+
   <!-- ── Layout strip (appears after seed is fetched) ── -->
   <div class="layout-strip" id="layoutStrip">
     <div class="layout-top-row">
@@ -923,7 +786,7 @@ Index · HTML
     </div>
     <div class="courses-row" id="coursesRow"></div>
   </div>
- 
+
   <!-- ── 9-Hole Scorecard ── -->
   <div class="layout-strip" id="scorecardSection" style="display:none;margin-bottom:16px;">
     <div class="layout-top-row" style="margin-bottom:14px;">
@@ -935,7 +798,7 @@ Index · HTML
       <span class="course-block-subpar" id="scorecardParBadge">—</span>
     </div>
   </div>
- 
+
   <!-- ── Leaderboard section ── -->
   <div id="leaderboardSection" style="display:none">
     <div class="controls-row" style="position:relative;">
@@ -964,17 +827,17 @@ Index · HTML
       <div id="lbRows"></div>
       </div>
   </div>
- 
+
   <div class="empty-state" id="emptyState">
     <div class="big-icon">🥏</div>
     <p id="emptyStateMsg">Loading today's leaderboard…</p>
   </div>
- 
+
   <div class="footer">
     <span>Original Leaderboard by DSallee</span><span class="footer-sep"> &nbsp;·&nbsp; </span><span>New Design and Functionality by Azwell</span><span class="footer-sep"> &nbsp;·&nbsp; </span><span>Code Provided by Claude AI</span>
   </div>
 </div>
- 
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 //  Constants
@@ -982,7 +845,7 @@ Index · HTML
 const PROJECT_ID     = '22c95154-2fe0-4923-8792-e2fe16880302';
 const LEADERBOARD_ID = 'daily_challenge';
 const PROXY          = '';
- 
+
 // ── Daily reset time (UTC) ──────────────────────────────────────────
 //  The leaderboard resets at 8:00 PM EST daily.
 //  EST = UTC-5  →  reset at 01:00 UTC  (RESET_HOUR_UTC = 1)
@@ -991,7 +854,7 @@ const PROXY          = '';
 //  CEST= UTC+2  →  reset at 18:00 UTC  (RESET_HOUR_UTC = 18)
 //  If the reset time ever drifts (e.g. seasonal DST), update this one value.
 const RESET_HOUR_UTC = 0;
- 
+
 let allScoresGlobal = [];
 let globalRanks     = [];
 let totalScores     = 0;
@@ -999,12 +862,12 @@ let accessToken     = null;
 let seededPar       = null;
 let todaySeed       = null;
 let todayLayout     = null;
- 
+
 // ── Flagged players (known cheaters) ───────────────────────────────
 // Edit public/flagged.json in your repo to add/remove names.
 // Names are case-insensitive and matched after stripping the #tag.
 let flaggedPlayers = new Set();
- 
+
 async function loadFlaggedPlayers() {
   try {
     const res = await fetch('flagged.json?_=' + Date.now());
@@ -1016,14 +879,14 @@ async function loadFlaggedPlayers() {
     // No flagged.json yet — that's fine
   }
 }
- 
+
 function isFlagged(playerName) {
   return flaggedPlayers.has(playerName.toLowerCase());
 }
- 
+
 // ── Nerd players (DGV VR Nerds) ────────────────────────────────────
 let nerdPlayers = new Set();
- 
+
 async function loadNerdPlayers() {
   try {
     const res = await fetch('nerds.json?_=' + Date.now());
@@ -1033,11 +896,11 @@ async function loadNerdPlayers() {
     console.log('[DGVR] Nerd players loaded:', nerdPlayers.size);
   } catch(e) {}
 }
- 
+
 function isNerd(playerName) {
   return nerdPlayers.has(playerName.toLowerCase());
 }
- 
+
 // ── Yesterday's leaderboard ──
 // Snapshot is fetched from /yesterday.json, which is written to public/
 // by the GitHub Actions workflow at 23:55 UTC daily and auto-deployed by Vercel.
@@ -1045,7 +908,7 @@ let yesterdaySnapshot = null;
 let distUnit = 'ft'; // 'ft' or 'm'
 let viewingYesterday  = false;
 let cheatersHidden    = false; // tracks whether cheaters are filtered out
- 
+
 async function loadYesterdaySnapshot() {
   try {
     const res = await fetch('yesterday.json?_=' + Date.now()); // cache-bust
@@ -1059,19 +922,19 @@ async function loadYesterdaySnapshot() {
     // No snapshot available yet, yesterday button stays hidden
   }
 }
- 
+
 function updateYesterdayBtn() {
   const yesterdayBtn      = document.getElementById('yesterdayBtn');
   const todayViewBtns     = document.getElementById('todayViewBtns');
   const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
   const cheaterBtn        = document.getElementById('cheaterFilterBtn');
   if (!yesterdayBtn) return;
- 
+
   // Keep label synced to shared state
   if (cheaterBtn) {
     cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
   }
- 
+
   if (viewingYesterday) {
     const w = todayViewBtns.offsetWidth;
     todayViewBtns.style.display     = 'none';
@@ -1088,21 +951,21 @@ function updateYesterdayBtn() {
     if (refreshWrap) refreshWrap.style.display = '';
   }
 }
- 
+
 // ── Cheater filter toggle ──────────────────────────────────────────
 function toggleCheaterFilter() {
   cheatersHidden = !cheatersHidden;
- 
+
   const cheaterBtn = document.getElementById('cheaterFilterBtn');
   if (cheaterBtn) cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
- 
+
   if (viewingYesterday && yesterdaySnapshot) {
     renderSnapshotLeaderboard(yesterdaySnapshot);
   } else {
     renderLeaderboard();
   }
 }
- 
+
 function toggleYesterdayLeaderboard() {
   if (viewingYesterday) {
     showTodayLeaderboard();
@@ -1124,7 +987,7 @@ function toggleYesterdayLeaderboard() {
     updateYesterdayBtn();
   }
 }
- 
+
 function showTodayLeaderboard() {
   viewingYesterday = false;
   document.getElementById('yesterdayBanner').style.display = 'none';
@@ -1144,13 +1007,13 @@ function showTodayLeaderboard() {
     autoLoadToken();
   }
 }
- 
+
 function renderSnapshotLeaderboard(snap) {
   const savedScores = allScoresGlobal;
   const savedRanks  = globalRanks;
   const savedTotal  = totalScores;
   const savedPar    = seededPar;
- 
+
   // Set par to yesterday's value so VS Par calculates correctly
   if (snap.seed) {
     const yLayout = generateLayout(snap.seed);
@@ -1158,7 +1021,7 @@ function renderSnapshotLeaderboard(snap) {
   } else if (snap.par) {
     seededPar = snap.par;
   }
- 
+
   // Filter cheaters if hidden
   const displayScores = cheatersHidden
     ? snap.scores.filter(e => !isFlagged(stripDiscTag(e.playerName)))
@@ -1166,7 +1029,7 @@ function renderSnapshotLeaderboard(snap) {
   const displayRanks = cheatersHidden
     ? computeTiedRanks(displayScores)
     : snap.ranks;
- 
+
   // Map original snap rank indices for nerd detection (on the filtered set)
   const snapNerdIndices = displayScores.reduce((acc, e, j) => {
     if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(j);
@@ -1174,10 +1037,10 @@ function renderSnapshotLeaderboard(snap) {
   }, []);
   const snapMultipleNerds = snapNerdIndices.length >= 2;
   const snapBestNerdRank  = snapNerdIndices.length >= 1 ? Math.min(...snapNerdIndices.map(j => displayRanks[j])) : Infinity;
- 
+
   document.getElementById('resultsCount').innerHTML =
     `<span>${displayScores.length}</span> players on yesterday's leaderboard`;
- 
+
   const container = document.getElementById('lbRows');
   container.innerHTML = displayScores.map((entry, i) => {
     const rank        = displayRanks[i];
@@ -1210,33 +1073,33 @@ function renderSnapshotLeaderboard(snap) {
       </div>
     `;
   }).join('');
- 
+
   document.getElementById('leaderboardSection').style.display = 'block';
   document.getElementById('emptyState').style.display = 'none';
- 
+
   // Restore live state variables (snapshot render is display-only)
   seededPar       = savedPar;
   allScoresGlobal = savedScores;
   globalRanks     = savedRanks;
   totalScores     = savedTotal;
- 
+
   // Sync button visibility and labels
   updateYesterdayBtn();
 }
- 
+
 // Refresh only the leaderboard rows without hiding the section or jumping the page
 async function refreshLeaderboardOnly() {
   if (viewingYesterday) { showTodayLeaderboard(); return; }
   if (!accessToken) { autoLoadToken(); return; }
- 
+
   const btn = document.getElementById('refreshBtn');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
- 
+
   try {
     const first = await fetchScoresPage(accessToken, 0, 100);
     totalScores = first.total || (first.results || []).length;
     const pages = [first.results || []];
- 
+
     if (totalScores > 100) {
       const fetches = [];
       for (let offset = 100; offset < totalScores; offset += 100) {
@@ -1245,10 +1108,10 @@ async function refreshLeaderboardOnly() {
       const rest = await Promise.all(fetches);
       rest.forEach(r => pages.push(r.results || []));
     }
- 
+
     allScoresGlobal = pages.flat();
     globalRanks     = computeTiedRanks(allScoresGlobal);
- 
+
     if (allScoresGlobal.length > 0) {
       renderLeaderboard();
       document.getElementById('leaderboardSection').style.display = 'block';
@@ -1261,7 +1124,7 @@ async function refreshLeaderboardOnly() {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
   }
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  System.Random — .NET Knuth subtractive generator (faithful port)
 // ═══════════════════════════════════════════════════════════════════
@@ -1269,7 +1132,7 @@ function SystemRandom(seed) {
   const MBIG  = 2147483647;
   const MSEED = 161803398;
   const sa    = new Int32Array(56);
- 
+
   let mj = MSEED - Math.abs(seed);
   if (mj < 0) mj += MBIG;
   sa[55] = mj;
@@ -1289,9 +1152,9 @@ function SystemRandom(seed) {
       if (sa[i] < 0) sa[i] += MBIG;
     }
   }
- 
+
   let inext = 0, inextp = 21;
- 
+
   function internalSample() {
     let li = inext, lp = inextp;
     if (++li >= 56) li = 1;
@@ -1302,7 +1165,7 @@ function SystemRandom(seed) {
     sa[li] = v; inext = li; inextp = lp;
     return v;
   }
- 
+
   function next() { return internalSample(); }
   function nextRange(min, max) {
     const range = max - min;
@@ -1311,7 +1174,7 @@ function SystemRandom(seed) {
   }
   return { next, nextRange };
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Course data
 // ═══════════════════════════════════════════════════════════════════
@@ -1325,7 +1188,7 @@ const COURSES = [
   { name: 'The Crows Nest',    holes: [3,3,4,4,3,3,4,3,4] },
   { name: 'Grizzly Gulch',     holes: [3,3,4,3,4,4,3,4,3] }
 ];
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Layout generation (pick-and-remove courses, LINQ OrderBy holes)
 // ═══════════════════════════════════════════════════════════════════
@@ -1333,14 +1196,14 @@ function generateLayout(seed) {
   const rng  = SystemRandom(seed);
   const pool = COURSES.slice();
   const selected = [];
- 
+
   // Pick-and-remove 3 courses
   for (let i = 0; i < 3; i++) {
     const idx = rng.nextRange(0, pool.length);
     selected.push(pool[idx]);
     pool.splice(idx, 1);
   }
- 
+
   let totalPar = 0;
   const courses = selected.map((course, ci) => {
     // LINQ OrderBy(h => rnd.Next()) — one key per hole, stable sort, take 3
@@ -1351,10 +1214,10 @@ function generateLayout(seed) {
     totalPar += coursePar;
     return { course, holes, coursePar };
   });
- 
+
   return { courses, totalPar };
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Hole distance data & unit toggle
 // ═══════════════════════════════════════════════════════════════════
@@ -1376,14 +1239,14 @@ const HOLE_DISTANCES = {
   'Grizzly Gulch':     { ft: { 1:357, 2:368, 3:347, 4:328, 5:435, 6:462, 7:448, 8:511, 9:484 },
                          m:  { 1:109, 2:112, 3:106, 4:100, 5:133, 6:142, 7:137, 8:156, 9:147 } },
 };
- 
+
 function getHoleDist(courseName, holeNum) {
   const cd = HOLE_DISTANCES[courseName];
   if (!cd) return '';
   const val = cd[distUnit][holeNum];
-  return val ? val + ' ' + distUnit.toUpperCase() : '';
+  return val ? val + ' ' + distUnit.toUpperCase() : '';
 }
- 
+
 function toggleDistUnit() {
   distUnit = distUnit === 'ft' ? 'm' : 'ft';
   const btn = document.getElementById('distToggleBtn');
@@ -1396,7 +1259,7 @@ function toggleDistUnit() {
     renderLayout(todaySeed, todayLayout);
   }
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Render layout strip
 // ═══════════════════════════════════════════════════════════════════
@@ -1404,7 +1267,7 @@ function renderLayout(seed, layout) {
   document.getElementById('seedBadge').textContent      = `Seed ${seed}`;
   document.getElementById('layoutParBadge').textContent = layout.totalPar;
   seededPar = layout.totalPar;
- 
+
   // Map each course name to its identity color
   const COURSE_COLORS = {
     'Sunshine Glade':    'var(--course-sunshine)',
@@ -1416,11 +1279,11 @@ function renderLayout(seed, layout) {
     'The Crows Nest':    'var(--course-crows)',
     'Grizzly Gulch':     'var(--course-grizzly)'
   };
- 
+
   const courseColors = layout.courses.map(entry =>
     COURSE_COLORS[entry.course.name] || 'var(--green-neon)'
   );
- 
+
   document.getElementById('coursesRow').innerHTML = layout.courses.map((entry, ci) => {
     const color = courseColors[ci];
     const holeChips = entry.holes.map(h => `
@@ -1429,7 +1292,7 @@ function renderLayout(seed, layout) {
         <span class="hole-pip-n">${h.holeNum}</span>
       </div>
     `).join('');
- 
+
     return `
       <div class="course-block" style="border-top: 2px solid ${color};">
         <div class="course-block-header">
@@ -1440,7 +1303,7 @@ function renderLayout(seed, layout) {
       </div>
     `;
   }).join('');
- 
+
   // Build 9-hole scorecard — flat grid
   const scorecardHtml = layout.courses.flatMap((entry, ci) => {
     const color = courseColors[ci];
@@ -1453,14 +1316,14 @@ function renderLayout(seed, layout) {
       </div>
     `);
   }).join('');
- 
+
   document.getElementById('scorecardRow').innerHTML = scorecardHtml;
   document.getElementById('scorecardParBadge').textContent = `TOTAL PAR ${layout.totalPar}`;
   document.getElementById('scorecardSection').style.display = 'block';
- 
+
   document.getElementById('layoutStrip').classList.add('show');
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Countdown + daily window
 //  Reset boundary defined by RESET_HOUR_UTC above.
@@ -1473,14 +1336,14 @@ function getDailyWindow() {
   const endUTC   = new Date(startUTC.getTime() + 86400000);
   return { startUTC, endUTC };
 }
- 
+
 function initDailyWindow() {
   const { startUTC, endUTC } = getDailyWindow();
   const fmt = d => d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })
     + ' ' + d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
   document.getElementById('dailyWindowDates').textContent = `${fmt(startUTC)} → ${fmt(endUTC)}`;
 }
- 
+
 function updateCountdown() {
   const { endUTC } = getDailyWindow();
   const diff = endUTC - new Date();
@@ -1488,7 +1351,7 @@ function updateCountdown() {
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
- 
+
   const pad = n => String(n).padStart(2, '0');
   const urgent = h === 0 && m < 10;
   ['cdH','cdM','cdS'].forEach(id => document.getElementById(id).classList.toggle('urgent', urgent));
@@ -1496,11 +1359,11 @@ function updateCountdown() {
   document.getElementById('cdM').textContent = pad(m);
   document.getElementById('cdS').textContent = pad(s);
 }
- 
+
 initDailyWindow();
 updateCountdown();
 setInterval(updateCountdown, 1000);
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Auth
 // ═══════════════════════════════════════════════════════════════════
@@ -1517,7 +1380,7 @@ async function exchangeToken(sessionToken) {
   const data = await res.json();
   return data.accessToken || data.idToken;
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Fetch daily seed from CloudSave
 // ═══════════════════════════════════════════════════════════════════
@@ -1533,7 +1396,7 @@ async function fetchDailySeed(token) {
   if (!seedEntry) throw new Error('No seed key found in dailySeed custom data');
   return seedEntry.value; // integer
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Fetch leaderboard scores (all pages)
 // ═══════════════════════════════════════════════════════════════════
@@ -1548,18 +1411,18 @@ async function fetchScoresPage(token, offset, limit = 100) {
   }
   return res.json();
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Par + score helpers
 // ═══════════════════════════════════════════════════════════════════
 function getPar() {
   return seededPar || null;
 }
- 
+
 function stripDiscTag(name) {
   return (name || 'Anonymous').replace(/#\d{1,6}$/, '').trim();
 }
- 
+
 function formatVsPar(rawScore) {
   const par = getPar();
   if (par === null) return { display: rawScore + '✦', cls: 'unknown', label: 'strokes (par unknown)' };
@@ -1568,7 +1431,7 @@ function formatVsPar(rawScore) {
   if (diff < 0)  return { display: String(diff), cls: 'under', label: 'under par' };
   return { display: '+' + diff, cls: 'over', label: 'over par' };
 }
- 
+
 function computeTiedRanks(scores) {
   const result = [];
   for (let i = 0; i < scores.length; i++) {
@@ -1580,38 +1443,38 @@ function computeTiedRanks(scores) {
   }
   return result;
 }
- 
+
 function getRankDisplay(rank, scores, index) {
   const tied = scores.some((s, i) => i !== index && s.score === scores[index].score);
   return tied ? `T${rank}` : String(rank);
 }
- 
+
 function getRankClass(rank) {
   if (rank === 1) return 'gold';
   if (rank === 2) return 'silver';
   if (rank === 3) return 'bronze';
   return '';
 }
- 
+
 function getRowClass(rank) {
   if (rank === 1) return 'lb-row top-1';
   if (rank === 2) return 'lb-row top-2';
   if (rank === 3) return 'lb-row top-3';
   return 'lb-row';
 }
- 
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Render full leaderboard (single scrollable list)
 // ═══════════════════════════════════════════════════════════════════
 function renderLeaderboard() {
   const container = document.getElementById('lbRows');
- 
+
   // If cheaters are hidden, work with a filtered set and recomputed ranks
   const displayScores = cheatersHidden
     ? allScoresGlobal.filter(e => !isFlagged(stripDiscTag(e.playerName)))
@@ -1619,7 +1482,7 @@ function renderLeaderboard() {
   const displayRanks = cheatersHidden
     ? computeTiedRanks(displayScores)
     : globalRanks;
- 
+
   // Gold badge: rank-1 nerd when 2+ nerds present; tied rank-1 nerds both get gold
   const nerdIndices = displayScores.reduce((acc, e, i) => {
     if (isNerd(stripDiscTag(e.playerName)) && !isFlagged(stripDiscTag(e.playerName))) acc.push(i);
@@ -1660,19 +1523,19 @@ function renderLeaderboard() {
       </div>
     `;
   }).join('');
- 
+
   const visibleCount = displayScores.length;
   document.getElementById('resultsCount').innerHTML =
     `<span>${visibleCount}</span> players on today's leaderboard`;
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Player history modal
 // ═══════════════════════════════════════════════════════════════════
 let historyData       = null;   // full parsed history.json array
 let historyLoaded     = false;
 let currentHistoryTab = 7;
- 
+
 async function loadHistoryData() {
   if (historyLoaded) return;
   try {
@@ -1684,7 +1547,7 @@ async function loadHistoryData() {
   }
   historyLoaded = true;
 }
- 
+
 function openHistoryModal(playerName) {
   const el = document.getElementById('historyPlayerName');
   el.textContent = playerName;
@@ -1704,15 +1567,15 @@ function openHistoryModal(playerName) {
   document.getElementById('tab30').classList.remove('active');
   loadHistoryData().then(() => renderHistoryContent(playerName, 7));
 }
- 
+
 function closeHistoryModal() {
   document.getElementById('historyOverlay').classList.remove('open');
 }
- 
+
 function handleOverlayClick(e) {
   if (e.target === document.getElementById('historyOverlay')) closeHistoryModal();
 }
- 
+
 function switchHistoryTab(days) {
   currentHistoryTab = days;
   document.getElementById('tab7').classList.toggle('active',  days === 7);
@@ -1721,7 +1584,7 @@ function switchHistoryTab(days) {
   const name = nameEl.dataset.rawName || nameEl.textContent;
   renderHistoryContent(name, days);
 }
- 
+
 function renderHistoryContent(playerName, days) {
   const el = document.getElementById('historyContent');
   if (!historyData || historyData.length < days) {
@@ -1745,15 +1608,15 @@ function renderHistoryContent(playerName, days) {
     const p = d.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
     return s + p.vsPar;
   }, 0) / played.length;
- 
+
   const vsParDisplay = avgVsPar === 0 ? 'E'
     : (avgVsPar > 0 ? '+' : '') + avgVsPar.toFixed(1);
   const vsParCls = avgVsPar < 0 ? 'under' : avgVsPar >= 1 ? 'over' : 'even';
- 
+
   // Floor avgRank to nearest lower whole number for color matching
   const flooredRank = Math.floor(avgRank);
   const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : 'rank-default';
- 
+
   el.innerHTML = `
     <div class="history-stat-row">
       <div class="history-stat">
@@ -1768,7 +1631,7 @@ function renderHistoryContent(playerName, days) {
     <div class="history-played">Played ${played.length} of ${days} days</div>
   `;
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Main fetch flow
 // ═══════════════════════════════════════════════════════════════════
@@ -1779,7 +1642,7 @@ async function fetchScoresOnly(token) {
     const first = await fetchScoresPage(token, 0, 100);
     totalScores = first.total || (first.results || []).length;
     const pages = [first.results || []];
- 
+
     if (totalScores > 100) {
       const fetches = [];
       for (let offset = 100; offset < totalScores; offset += 100) {
@@ -1788,10 +1651,10 @@ async function fetchScoresOnly(token) {
       const rest = await Promise.all(fetches);
       rest.forEach(r => pages.push(r.results || []));
     }
- 
+
     allScoresGlobal = pages.flat();
     globalRanks     = computeTiedRanks(allScoresGlobal);
- 
+
     if (allScoresGlobal.length === 0) {
       document.getElementById('lbRows').innerHTML = '';
       document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
@@ -1801,25 +1664,25 @@ async function fetchScoresOnly(token) {
       updateYesterdayBtn();
       return;
     }
- 
+
     renderLeaderboard();
     document.getElementById('leaderboardSection').style.display = 'block';
- 
+
   } catch (err) {
     // Token may have expired — fall back to full re-auth
     console.warn('[DGVR] fetchScoresOnly failed, falling back to full reload:', err.message);
     autoLoadToken();
   }
 }
- 
+
 async function fetchAll(token) {
   document.getElementById('leaderboardSection').style.display = 'none';
   document.getElementById('emptyState').style.display = 'none';
- 
+
   try {
     // 1. Auth
     accessToken = await exchangeToken(token);
- 
+
     // 2. Fetch seed → generate layout
     try {
       const seed   = await fetchDailySeed(accessToken);
@@ -1831,12 +1694,12 @@ async function fetchAll(token) {
     } catch(seedErr) {
       console.warn('Seed fetch failed:', seedErr.message);
     }
- 
+
     // 3. Fetch all leaderboard scores
     const first = await fetchScoresPage(accessToken, 0, 100);
     totalScores = first.total || (first.results || []).length;
     const pages = [first.results || []];
- 
+
     if (totalScores > 100) {
       const fetches = [];
       for (let offset = 100; offset < totalScores; offset += 100) {
@@ -1845,14 +1708,14 @@ async function fetchAll(token) {
       const rest = await Promise.all(fetches);
       rest.forEach(r => pages.push(r.results || []));
     }
- 
+
     allScoresGlobal = pages.flat();
     globalRanks     = computeTiedRanks(allScoresGlobal);
- 
+
     // Always show the controls/buttons
     document.getElementById('leaderboardSection').style.display = 'block';
     updateYesterdayBtn();
- 
+
     if (allScoresGlobal.length === 0) {
       document.getElementById('lbRows').innerHTML = '';
       document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
@@ -1860,17 +1723,17 @@ async function fetchAll(token) {
       document.getElementById('emptyStateMsg').textContent = 'No scores yet — check back soon!';
       return;
     }
- 
+
     document.getElementById('emptyState').style.display = 'none';
     renderLeaderboard();
- 
+
   } catch (err) {
     document.getElementById('emptyStateMsg').textContent = 'Could not load leaderboard. Please try again later.';
     document.getElementById('emptyState').style.display = 'block';
     console.error(err);
   }
 }
- 
+
 // ═══════════════════════════════════════════════════════════════════
 //  Auto-load: fetch session token from proxy and kick off everything
 // ═══════════════════════════════════════════════════════════════════
@@ -1901,7 +1764,7 @@ async function autoLoadToken() {
     document.getElementById('emptyState').style.display = 'block';
   }
 }
- 
+
 loadFlaggedPlayers();
 loadNerdPlayers();
 loadYesterdaySnapshot();
@@ -1919,7 +1782,7 @@ autoLoadToken();
       <button class="history-close-btn" onclick="closeHistoryModal()">Close</button>
     </div>
   </div>
- 
+
   <!-- ── Hole slideshow overlay ── -->
   <div class="hole-overlay" id="holeOverlay" onclick="handleHoleOverlayClick(event)">
     <div class="hole-modal" id="holeModal">
@@ -1937,7 +1800,7 @@ autoLoadToken();
       <div class="hole-dots" id="holeDots"></div>
     </div>
   </div>
- 
+
   <script>
   // Course name to filename abbreviation map
   const COURSE_ABBR = {
@@ -1950,11 +1813,11 @@ autoLoadToken();
     'The Crows Nest':    'CN',
     'Grizzly Gulch':     'GG'
   };
- 
+
   let slideshowHoles  = [];
   let slideshowCursor = 0;
   let slideSwipeStartX = 0;
- 
+
   function buildSlideshowHoles(layout) {
     const list = [];
     layout.courses.forEach(entry => {
@@ -1964,22 +1827,22 @@ autoLoadToken();
     });
     return list;
   }
- 
+
   function openHoleSlideshow() {
     const layout = viewingYesterday && yesterdaySnapshot && yesterdaySnapshot.seed
       ? generateLayout(yesterdaySnapshot.seed)
       : todayLayout;
     if (!layout) return;
- 
+
     slideshowHoles  = buildSlideshowHoles(layout);
     slideshowCursor = 0;
- 
+
     document.getElementById('holeModal').classList.toggle('yesterday-mode', viewingYesterday);
- 
+
     buildHoleDots();
     updateHoleSlide();
     document.getElementById('holeOverlay').classList.add('open');
- 
+
     const imgWrap = document.getElementById('holeImgWrap');
     imgWrap.ontouchstart = e => { slideSwipeStartX = e.touches[0].clientX; };
     imgWrap.ontouchend   = e => {
@@ -1987,54 +1850,52 @@ autoLoadToken();
       if (Math.abs(dx) > 40) changeHoleSlide(dx < 0 ? 1 : -1);
     };
   }
- 
+
   function closeHoleSlideshow() {
     document.getElementById('holeOverlay').classList.remove('open');
   }
- 
+
   function handleHoleOverlayClick(e) {
     if (e.target === document.getElementById('holeOverlay')) closeHoleSlideshow();
   }
- 
+
   function changeHoleSlide(dir) {
     slideshowCursor = Math.max(0, Math.min(slideshowHoles.length - 1, slideshowCursor + dir));
     updateHoleSlide();
   }
- 
+
   function jumpHoleSlide(i) {
     slideshowCursor = i;
     updateHoleSlide();
   }
- 
+
   function buildHoleDots() {
     document.getElementById('holeDots').innerHTML = slideshowHoles.map((_, i) =>
       '<div class="hole-dot' + (i === 0 ? ' active' : '') + '" onclick="jumpHoleSlide(' + i + ')"></div>'
     ).join('');
   }
- 
+
   function updateHoleSlide() {
     const h      = slideshowHoles[slideshowCursor];
     const abbr   = COURSE_ABBR[h.course] || 'XX';
     const imgSrc = 'holes/' + abbr + h.holeNum + '.png';
- 
+
     document.getElementById('holeImgWrap').innerHTML =
       '<img src="' + imgSrc + '" alt="' + h.course + ' Hole ' + h.holeNum + '" ' +
       'onerror="this.parentNode.innerHTML='<div class=hole-img-placeholder>Photo coming soon</div>'">';
- 
+
     document.getElementById('holeCaptionCourse').textContent = h.course;
     document.getElementById('holeCaptionHole').textContent   = 'Hole ' + h.holeNum;
     document.getElementById('holeCaptionPar').textContent    = 'Par ' + h.par;
- 
+
     document.getElementById('holePrevBtn').disabled = slideshowCursor === 0;
     document.getElementById('holeNextBtn').disabled = slideshowCursor === slideshowHoles.length - 1;
- 
+
     document.querySelectorAll('#holeDots .hole-dot').forEach((d, i) => {
       d.classList.toggle('active', i === slideshowCursor);
     });
   }
   </script>
- 
+
 </body>
 </html>
- 
-
