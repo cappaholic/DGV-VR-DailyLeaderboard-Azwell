@@ -639,7 +639,7 @@
     background: var(--card);
     line-height: 0;
     flex-shrink: 0;
-    padding: 4px 8px 0;
+    padding: 8px 8px 0;
   }
   .hole-img-wrap img {
     width: 100%; display: block; height: auto;
@@ -647,6 +647,14 @@
   }
   .hole-img-wrap img.fading {
     opacity: 0;
+  }
+  /* Placeholder shown while next image loads — same size as current img */
+  .hole-img-sizer {
+    position: relative;
+  }
+  .hole-img-sizer img {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%; object-fit: cover;
   }
   .hole-img-placeholder {
     width: 100%; aspect-ratio: 16/9;
@@ -1880,10 +1888,24 @@ autoLoadToken();
     const existing = wrap.querySelector('img');
 
     function setImage() {
+      // Lock the wrap height to its current rendered height before swapping,
+      // so the modal doesn't collapse/expand while the new image loads.
+      if (existing) {
+        wrap.style.height = wrap.offsetHeight + 'px';
+      }
+
       const img = document.createElement('img');
+      img.style.opacity = '0';
       img.src = imgSrc;
       img.alt = h.course + ' Hole ' + h.holeNum;
+      img.onload = function() {
+        // Release the fixed height now that the new image is ready, then fade in
+        wrap.style.height = '';
+        img.style.transition = 'opacity 0.2s ease';
+        img.style.opacity = '1';
+      };
       img.onerror = function() {
+        wrap.style.height = '';
         wrap.innerHTML = '<div class="hole-img-placeholder">Photo coming soon</div>';
       };
       wrap.innerHTML = '';
@@ -1891,8 +1913,9 @@ autoLoadToken();
     }
 
     if (animate && existing) {
-      existing.classList.add('fading');
-      setTimeout(setImage, 200);
+      existing.style.transition = 'opacity 0.15s ease';
+      existing.style.opacity = '0';
+      setTimeout(setImage, 150);
     } else {
       setImage();
     }
@@ -1901,10 +1924,6 @@ autoLoadToken();
 
     document.getElementById('holePrevBtn').disabled = slideshowCursor === 0;
     document.getElementById('holeNextBtn').disabled = slideshowCursor === slideshowHoles.length - 1;
-
-    document.querySelectorAll('#holeDots .hole-dot').forEach((d, i) => {
-      d.classList.toggle('active', i === slideshowCursor);
-    });
   }
   </script>
 
