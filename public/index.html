@@ -624,7 +624,7 @@
   .hole-modal {
     background: var(--card);
     border: 1px solid var(--border);
-    border-top: 2px solid var(--accent2);
+    border-top: 3px solid var(--accent2);
     border-radius: 12px;
     width: min(860px, 96vw);
     overflow: hidden;
@@ -633,11 +633,13 @@
   }
   .hole-modal.yesterday-mode { border-top-color: #e8833a; }
 
+  /* Image sits immediately below the top border — no gap */
   .hole-img-wrap {
     position: relative;
     background: var(--surface);
     line-height: 0;
     flex-shrink: 0;
+    margin-top: 0;
   }
   .hole-img-wrap img {
     width: 100%; aspect-ratio: 16/9; object-fit: contain; display: block;
@@ -651,41 +653,46 @@
     letter-spacing: 1px; text-transform: uppercase;
   }
 
-  /* Side nav arrows */
+  /* Caption + arrows sit in one compact row right below image */
   .hole-nav-row {
     display: flex; align-items: center; gap: 0;
+    padding: 0;
   }
   .hole-nav-btn {
-    background: rgba(9,22,34,0.7);
+    background: transparent;
     border: none; color: var(--muted);
-    font-size: 22px; cursor: pointer;
-    padding: 0 14px;
-    align-self: stretch;
-    transition: color 0.15s, background 0.15s;
+    font-size: 26px; cursor: pointer;
+    padding: 2px 16px;
+    transition: color 0.15s;
     flex-shrink: 0;
+    line-height: 1;
   }
-  .hole-nav-btn:hover:not(:disabled) { color: var(--white); background: rgba(9,22,34,0.95); }
+  .hole-nav-btn:hover:not(:disabled) { color: var(--white); }
   .hole-nav-btn:disabled { opacity: 0.2; cursor: default; }
 
   .hole-caption {
     flex: 1;
-    padding: 6px 16px 4px;
-    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 4px 8px 2px;
+    display: flex; flex-direction: column; align-items: center; gap: 0;
     min-width: 0; text-align: center;
   }
   .hole-caption-hole {
     font-family: 'DM Mono', monospace;
-    font-size: 9px; letter-spacing: 2px;
-    color: var(--muted); text-transform: uppercase;
+    font-size: 8px; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase; line-height: 1.4;
   }
   .hole-caption-num {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 26px; color: var(--white); line-height: 1;
+    font-size: 24px; color: var(--white); line-height: 1;
   }
 
+  /* Dots + close button centered below nav row */
+  .hole-footer {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; padding: 4px 0 10px;
+  }
   .hole-dots {
     display: flex; justify-content: center; gap: 6px;
-    padding: 4px 0 0;
   }
   .hole-dot {
     width: 7px; height: 7px; border-radius: 50%;
@@ -696,12 +703,11 @@
   .hole-modal.yesterday-mode .hole-dot.active { background: #e8833a; }
 
   .hole-close-btn {
-    display: block; width: calc(100% - 32px); margin: 6px 16px 10px;
     font-family: 'DM Mono', monospace;
     font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
     background: transparent; border: 1px solid var(--border);
     color: var(--muted); border-radius: 4px;
-    padding: 7px 0; cursor: pointer;
+    padding: 5px 24px; cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
   }
   .hole-close-btn:hover { color: var(--white); border-color: var(--white); }
@@ -1791,8 +1797,10 @@ autoLoadToken();
         </div>
         <button class="hole-nav-btn" id="holeNextBtn" onclick="changeHoleSlide(1)">&#8250;</button>
       </div>
-      <div class="hole-dots" id="holeDots"></div>
-      <button class="hole-close-btn" onclick="closeHoleSlideshow()">Close</button>
+      <div class="hole-footer">
+        <div class="hole-dots" id="holeDots"></div>
+        <button class="hole-close-btn" onclick="closeHoleSlideshow()">Close</button>
+      </div>
     </div>
   </div>
 
