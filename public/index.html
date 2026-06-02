@@ -269,11 +269,11 @@
   }
   .history-modal.yesterday-mode { border-top-color: #e8833a; }
   .history-cheater-btn {
-    width: 100%; margin-top: 10px;
+    display: inline-block; width: auto;
     background: transparent; border: 1px solid var(--border);
     color: var(--muted); font-family: 'DM Mono', monospace;
     font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
-    padding: 7px 0; border-radius: 4px; cursor: pointer;
+    padding: 7px 16px; border-radius: 4px; cursor: pointer;
     transition: border-color 0.2s, color 0.2s;
   }
   .history-cheater-btn:hover { border-color: var(--muted); color: var(--white); }
@@ -335,12 +335,12 @@
     text-transform: uppercase; margin-bottom: 20px;
   }
   .history-close-btn {
-    display: block; width: 100%;
+    display: inline-block; width: auto;
     font-family: 'DM Mono', monospace;
     font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
     background: transparent; border: 1px solid var(--border);
     color: var(--muted); border-radius: 4px;
-    padding: 7px 0; cursor: pointer;
+    padding: 7px 16px; cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
   }
   .history-close-btn:hover { color: var(--white); border-color: var(--white); }
@@ -1649,7 +1649,7 @@ function renderHistoryContent(playerName, days) {
   const flooredRank = Math.floor(avgRank);
   const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : 'rank-default';
 
-  const btnLabel = historyExcludeCheaters ? 'Cheaters Excluded' : 'Include Cheaters';
+  const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
   const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
   el.innerHTML = `
@@ -1664,7 +1664,9 @@ function renderHistoryContent(playerName, days) {
       </div>
     </div>
     <div class="history-played">Played ${played.length} of ${days} days</div>
-    <button class="${btnCls}" onclick="toggleHistoryCheaters()">${btnLabel}</button>
+    <div style="text-align:center; margin-top:10px;">
+      <button class="${btnCls}" onclick="toggleHistoryCheaters()">${btnLabel}</button>
+    </div>
   `;
 }
 
@@ -1822,7 +1824,9 @@ autoLoadToken();
         <button class="history-tab"        id="tab30" onclick="switchHistoryTab(30)">30 Day</button>
       </div>
       <div class="history-content" id="historyContent"></div>
-      <button class="history-close-btn" onclick="closeHistoryModal()">Close</button>
+      <div style="text-align:center; margin-top:10px;">
+        <button class="history-close-btn" onclick="closeHistoryModal()">Close</button>
+      </div>
     </div>
   </div>
 
