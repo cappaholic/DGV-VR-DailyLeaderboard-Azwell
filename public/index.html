@@ -311,9 +311,12 @@
     font-size: 28px; color: var(--white);
     display: block; line-height: 1;
   }
-  .history-stat-value.under { color: var(--green-neon); }
-  .history-stat-value.over  { color: #e05c5c; }
-  .history-stat-value.even  { color: var(--white); }
+  .history-stat-value.under  { color: var(--green-neon); }
+  .history-stat-value.over   { color: #e05c5c; }
+  .history-stat-value.even   { color: var(--white); }
+  .history-stat-value.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
+  .history-stat-value.silver { color: var(--silver); }
+  .history-stat-value.bronze { color: var(--bronze); }
   .history-played {
     font-size: 10px; color: var(--muted); letter-spacing: 1px;
     text-transform: uppercase; margin-bottom: 20px;
@@ -1429,8 +1432,15 @@ async function loadHistoryData() {
   historyLoaded = true;
 }
 
+function toDisplayCase(name) {
+  // Capitalize the first letter after each dot or space, lowercase the rest
+  return name.replace(/([^.\s]+)/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 function openHistoryModal(playerName) {
-  document.getElementById('historyPlayerName').textContent = playerName;
+  const el = document.getElementById('historyPlayerName');
+  el.textContent = toDisplayCase(playerName);
+  el.dataset.rawName = playerName;
   document.getElementById('historyOverlay').classList.add('open');
   if (isFlagged(playerName)) {
     document.getElementById('tab7').classList.remove('active');
@@ -1459,7 +1469,8 @@ function switchHistoryTab(days) {
   currentHistoryTab = days;
   document.getElementById('tab7').classList.toggle('active',  days === 7);
   document.getElementById('tab30').classList.toggle('active', days === 30);
-  const name = document.getElementById('historyPlayerName').textContent;
+  const nameEl = document.getElementById('historyPlayerName');
+  const name = nameEl.dataset.rawName || nameEl.textContent;
   renderHistoryContent(name, days);
 }
 
@@ -1489,13 +1500,17 @@ function renderHistoryContent(playerName, days) {
 
   const vsParDisplay = avgVsPar === 0 ? 'E'
     : (avgVsPar > 0 ? '+' : '') + avgVsPar.toFixed(1);
-  const vsParCls = avgVsPar < 0 ? 'under' : avgVsPar > 0 ? 'over' : 'even';
+  const vsParCls = avgVsPar < 0 ? 'under' : avgVsPar >= 1 ? 'over' : 'even';
+
+  // Floor avgRank to nearest lower whole number for color matching
+  const flooredRank = Math.floor(avgRank);
+  const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : '';
 
   el.innerHTML = `
     <div class="history-stat-row">
       <div class="history-stat">
         <span class="history-stat-label">Avg Rank</span>
-        <span class="history-stat-value">${avgRank.toFixed(1)}</span>
+        <span class="history-stat-value ${rankCls}">${avgRank.toFixed(1)}</span>
       </div>
       <div class="history-stat">
         <span class="history-stat-label">Avg VS Par</span>
