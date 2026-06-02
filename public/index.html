@@ -268,8 +268,7 @@
     font-family: 'DM Mono', monospace;
   }
   .history-modal-name {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 18px; font-weight: 500; letter-spacing: 2px;
+    font-size: 16px; font-weight: 500;
     color: var(--white);
     margin-bottom: 16px; text-align: center;
   }
@@ -312,12 +311,13 @@
     font-size: 28px; color: var(--white);
     display: block; line-height: 1;
   }
-  .history-stat-value.under  { color: var(--green-neon); }
+  .history-stat-value.under  { color: #5aad3c; }
   .history-stat-value.over   { color: #e05c5c; }
   .history-stat-value.even   { color: var(--white); }
   .history-stat-value.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
   .history-stat-value.silver { color: var(--silver); }
   .history-stat-value.bronze { color: var(--bronze); }
+  .history-stat-value.rank-default { color: var(--muted); }
   .history-played {
     font-size: 10px; color: var(--muted); letter-spacing: 1px;
     text-transform: uppercase; margin-bottom: 20px;
@@ -1505,7 +1505,7 @@ function renderHistoryContent(playerName, days) {
 
   // Floor avgRank to nearest lower whole number for color matching
   const flooredRank = Math.floor(avgRank);
-  const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : '';
+  const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : 'rank-default';
 
   el.innerHTML = `
     <div class="history-stat-row">
