@@ -268,6 +268,7 @@
     font-family: 'DM Mono', monospace;
   }
   .history-modal-name {
+    font-family: 'DM Sans', sans-serif;
     font-size: 16px; font-weight: 500;
     color: var(--white);
     margin-bottom: 16px; text-align: center;
@@ -317,7 +318,7 @@
   .history-stat-value.gold   { color: var(--gold);   text-shadow: 0 0 20px rgba(240,180,41,0.4); }
   .history-stat-value.silver { color: var(--silver); }
   .history-stat-value.bronze { color: var(--bronze); }
-  .history-stat-value.rank-default { color: var(--muted); }
+  .history-stat-value.rank-default { color: #eaeaea; }
   .history-played {
     font-size: 10px; color: var(--muted); letter-spacing: 1px;
     text-transform: uppercase; margin-bottom: 20px;
@@ -1433,14 +1434,9 @@ async function loadHistoryData() {
   historyLoaded = true;
 }
 
-function toDisplayCase(name) {
-  // Capitalize the first letter after each dot or space, lowercase the rest
-  return name.replace(/([^.\s]+)/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-}
-
 function openHistoryModal(playerName) {
   const el = document.getElementById('historyPlayerName');
-  el.textContent = toDisplayCase(playerName);
+  el.textContent = playerName;
   el.dataset.rawName = playerName;
   document.getElementById('historyOverlay').classList.add('open');
   if (isFlagged(playerName)) {
