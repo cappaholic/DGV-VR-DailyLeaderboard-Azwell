@@ -1669,7 +1669,7 @@ function renderHistoryContent(playerName, days) {
     return;
   }
   if (played.length < 2) {
-    el.innerHTML = `<div class="history-unavailable">Not enough data<br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span></div>`;
+    el.innerHTML = `<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">2 day minimum required</span></div>`;
     return;
   }
 
