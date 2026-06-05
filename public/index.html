@@ -1668,6 +1668,10 @@ function renderHistoryContent(playerName, days) {
     el.innerHTML = `<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
     return;
   }
+  if (played.length < 2) {
+    el.innerHTML = `<div class="history-unavailable">Not enough data<br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span></div>`;
+    return;
+  }
 
   // Compute stats, optionally re-ranking without cheaters
   let totalRank = 0;
@@ -1720,7 +1724,7 @@ function renderHistoryContent(playerName, days) {
         <span class="history-stat-value ${vsParCls}">${vsParDisplay}</span>
       </div>
     </div>
-    <div class="history-played">Played ${played.length} of ${days} days</div>
+    <div class="history-played">${played.length} of ${days} days played</div>
     <div style="text-align:center; margin-top:10px;">
       <button class="${btnCls}" onclick="toggleHistoryCheaters()">${btnLabel}</button>
     </div>
