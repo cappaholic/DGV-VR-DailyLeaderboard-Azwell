@@ -828,9 +828,8 @@
   <div id="leaderboardSection" style="display:none">
     <div class="controls-row" style="position:relative;">
       <div class="results-count" id="resultsCount"></div>
-      <div id="cheaterFilterCenter" style="position:absolute; left:50%; transform:translateX(-50%); display:flex; gap:8px;">
+      <div id="cheaterFilterCenter" style="position:absolute; left:50%; transform:translateX(-50%);">
         <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()">Remove Cheaters</button>
-        <button class="refresh-btn" id="handicapBtn" onclick="toggleHandicapLeaderboard()">Handicap Scores</button>
       </div>
       <div id="todayViewBtns" class="btn-group">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
@@ -844,10 +843,13 @@
       Viewing Yesterday's Leaderboard
     </div>
     <div class="leaderboard">
-      <div class="lb-header">
+      <div class="lb-header" style="position:relative;">
         <span>Rank</span>
         <span>Player</span>
-        <span style="text-align:right" id="vsParHeader">VS Par</span>
+        <span style="display:contents;">
+          <button class="refresh-btn" id="handicapBtn" onclick="toggleHandicapLeaderboard()" style="position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap;">Handicap Scores</button>
+        </span>
+        <span style="text-align:right; white-space:nowrap;" id="vsParHeader">VS Par</span>
         <span style="text-align:right">Strokes</span>
       </div>
       <div id="lbRows"></div>
@@ -967,12 +969,15 @@ function updateYesterdayBtn() {
   // Manage center button group visibility
   const cheaterFilterBtn = document.getElementById('cheaterFilterBtn');
   if (cheaterCenter) {
-    // Hide entire center group only when viewing yesterday (those buttons don't apply)
-    cheaterCenter.style.display = viewingYesterday ? 'none' : '';
+    cheaterCenter.style.display = (viewingHandicap || viewingYesterday) ? 'none' : '';
   }
-  // Hide cheater button in handicap mode (cheaters already fully excluded)
   if (cheaterFilterBtn) {
-    cheaterFilterBtn.style.display = (viewingHandicap || viewingYesterday) ? 'none' : '';
+    cheaterFilterBtn.style.display = '';
+  }
+
+  // Handicap button lives in lb-header — just toggle active state
+  if (handicapBtn) {
+    handicapBtn.classList.toggle('handicap-active', viewingHandicap);
   }
 
   // Handicap button lives in the lb-header — just toggle active state
