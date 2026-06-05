@@ -516,7 +516,6 @@
     padding: 10px 20px;
     background: var(--surface); border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 2;
-    align-items: center;
   }
   .lb-header span {
     font-family: 'DM Mono', monospace; font-size: 9px;
@@ -829,8 +828,9 @@
   <div id="leaderboardSection" style="display:none">
     <div class="controls-row" style="position:relative;">
       <div class="results-count" id="resultsCount"></div>
-      <div id="cheaterFilterCenter" style="position:absolute; left:50%; transform:translateX(-50%);">
+      <div id="cheaterFilterCenter" style="position:absolute; left:50%; transform:translateX(-50%); display:flex; gap:8px;">
         <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()">Remove Cheaters</button>
+        <button class="refresh-btn" id="handicapBtn" onclick="toggleHandicapLeaderboard()">Handicap Scores</button>
       </div>
       <div id="todayViewBtns" class="btn-group">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
@@ -846,26 +846,7 @@
     <div class="leaderboard">
       <div class="lb-header">
         <span>Rank</span>
-        <span style="position:relative;">
-          Player
-          <button id="handicapBtn" onclick="toggleHandicapLeaderboard()" style="
-            position: absolute;
-            left: 50%; top: 50%;
-            transform: translate(-50%, -50%);
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            color: var(--muted);
-            font-family: 'DM Mono', monospace;
-            font-size: 9px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            padding: 3px 10px;
-            cursor: pointer;
-            transition: color 0.15s, border-color 0.15s;
-            white-space: nowrap;
-          ">Handicap Scores</button>
-        </span>
+        <span>Player</span>
         <span style="text-align:right" id="vsParHeader">VS Par</span>
         <span style="text-align:right">Strokes</span>
       </div>
@@ -983,9 +964,15 @@ function updateYesterdayBtn() {
     cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
   }
 
-  // Hide cheater button in handicap mode
+  // Manage center button group visibility
+  const cheaterFilterBtn = document.getElementById('cheaterFilterBtn');
   if (cheaterCenter) {
-    cheaterCenter.style.display = viewingHandicap ? 'none' : '';
+    // Hide entire center group only when viewing yesterday (those buttons don't apply)
+    cheaterCenter.style.display = viewingYesterday ? 'none' : '';
+  }
+  // Hide cheater button in handicap mode (cheaters already fully excluded)
+  if (cheaterFilterBtn) {
+    cheaterFilterBtn.style.display = (viewingHandicap || viewingYesterday) ? 'none' : '';
   }
 
   // Handicap button lives in the lb-header — just toggle active state
@@ -1910,7 +1897,7 @@ function toggleHandicapLeaderboard() {
   viewingHandicap = !viewingHandicap;
   const vsParHeader = document.getElementById('vsParHeader');
   if (viewingHandicap) {
-    if (vsParHeader) vsParHeader.textContent = 'Hdcp VS Par';
+    if (vsParHeader) vsParHeader.textContent = 'Handicapped VS Par';
     loadHistoryData().then(() => {
       renderHandicapLeaderboard();
       updateYesterdayBtn();
