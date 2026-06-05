@@ -976,8 +976,20 @@ function updateYesterdayBtn() {
     cheaterFilterBtn.style.display = '';
   }
 
-  // Handicap button lives in lb-header — just toggle active state
+  // Handicap button lives in lb-header — show only when data threshold is met
   if (handicapBtn) {
+    const hasEnoughData = historyData && historyData.length > 0 &&
+      (() => {
+        const counts = {};
+        historyData.forEach(day => {
+          day.players.forEach(p => {
+            const name = stripDiscTag(p.name).toLowerCase();
+            if (!isFlagged(stripDiscTag(p.name))) counts[name] = (counts[name] || 0) + 1;
+          });
+        });
+        return Object.values(counts).some(c => c >= 30);
+      })();
+    handicapBtn.style.display = hasEnoughData ? '' : 'none';
     handicapBtn.classList.toggle('handicap-active', viewingHandicap);
   }
 
