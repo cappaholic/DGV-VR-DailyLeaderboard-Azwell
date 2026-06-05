@@ -512,10 +512,11 @@
   }
   .lb-header {
     display: grid;
-    grid-template-columns: 64px 1fr 100px 100px;
+    grid-template-columns: 64px 1fr 160px 100px;
     padding: 14px 20px;
     background: var(--surface); border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 2;
+    align-items: center;
   }
   .lb-header span {
     font-family: 'DM Mono', monospace; font-size: 9px;
@@ -526,7 +527,7 @@
 
   .lb-row {
     display: grid;
-    grid-template-columns: 64px 1fr 100px 100px;
+    grid-template-columns: 64px 1fr 160px 100px;
     padding: 12px 20px;
     border-bottom: 1px solid rgba(30,61,85,0.7);
     align-items: center; transition: background 0.15s;
@@ -594,7 +595,7 @@
   .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; align-self: stretch; }
 
   @media (max-width: 600px) {
-    .lb-header, .lb-row { grid-template-columns: 48px 1fr 72px 72px; padding: 10px 12px; align-items: end; }
+    .lb-header, .lb-row { grid-template-columns: 48px 1fr 100px 72px; padding: 10px 12px; align-items: end; }
     .lb-row .score-cell { justify-content: flex-end; }
     .score-vs-par { font-size: 20px; }
   }
