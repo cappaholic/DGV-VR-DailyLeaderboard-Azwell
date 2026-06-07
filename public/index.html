@@ -995,7 +995,7 @@ function updateYesterdayBtn() {
   // Manage center button group visibility
   const cheaterFilterBtn = document.getElementById('cheaterFilterBtn');
   if (cheaterCenter) {
-    cheaterCenter.style.display = (viewingHandicap || viewingYesterday) ? 'none' : '';
+    cheaterCenter.style.display = viewingHandicap ? 'none' : '';
   }
   if (cheaterFilterBtn) {
     cheaterFilterBtn.style.display = '';
