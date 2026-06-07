@@ -1150,7 +1150,7 @@ function renderSnapshotLeaderboard(snap) {
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
         <div class="rank ${flagged ? '' : rankCls}">${rankDisplay}</div>
-        <div><div class="player-name" onclick="openHistoryModal('${escapeHtml(playerName)}')" style="cursor:pointer">${escapeHtml(playerName)}</div></div>
+        <div class="player-name-wrap"><div class="player-name" onclick="openHistoryModal('${escapeHtml(playerName)}')" style="cursor:pointer">${escapeHtml(playerName)}</div></div>
         <div class="score-cell">
           <div class="score-vs-par ${flagged ? 'even' : fmt.cls}">${fmt.display}</div>
           <div class="score-raw">${fmt.label}</div>
@@ -1598,7 +1598,7 @@ function renderLeaderboard() {
       <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
         <div class="rank ${flagged ? '' : rankCls}">${rankDisplay}</div>
-        <div>
+        <div class="player-name-wrap">
           <div class="player-name" onclick="openHistoryModal('${escapeHtml(playerName)}')" style="cursor:pointer">${escapeHtml(playerName)}</div>
         </div>
         <div class="score-cell">
@@ -2069,7 +2069,7 @@ function applyMarquee() {
 
 // Run after leaderboard renders (small delay for layout paint)
 const _origRenderLb = typeof renderLeaderboard === 'function' ? renderLeaderboard : null;
-function scheduleMarquee() { setTimeout(applyMarquee, 120); }
+function scheduleMarquee() { setTimeout(applyMarquee, 300); }
 // Hook into MutationObserver on the leaderboard containers
 ['leaderboardBody', 'yesterdayBody', 'handicapBody'].forEach(id => {
   const el = document.getElementById(id);
