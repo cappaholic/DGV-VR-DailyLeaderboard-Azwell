@@ -307,6 +307,9 @@
     display: flex; justify-content: space-around;
     margin-bottom: 18px; gap: 8px;
   }
+  .history-stat-col {
+    flex: 1; display: flex; flex-direction: column; gap: 8px;
+  }
   .history-stat {
     flex: 1; background: rgba(0,0,0,0.3);
     border: 1px solid var(--border); border-radius: 6px;
@@ -1701,9 +1704,15 @@ function renderHistoryContent(playerName, days) {
   // Compute stats, optionally re-ranking without cheaters
   let totalRank = 0;
   let totalVsPar = 0;
+  let bestRank = Infinity, worstRank = -Infinity;
+  let bestVsPar = Infinity, worstVsPar = -Infinity;
   played.forEach(day => {
     const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
     totalVsPar += me.vsPar;
+    if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
+    if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
+
+    let dayRank;
     if (historyExcludeCheaters) {
       // Re-rank: remove cheaters, sort by score ascending, apply tied ranking
       const clean = day.players
@@ -1718,10 +1727,13 @@ function renderHistoryContent(playerName, days) {
         }
       }
       const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-      totalRank += pos >= 0 ? reranked[pos] : me.rank;
+      dayRank = pos >= 0 ? reranked[pos] : me.rank;
     } else {
-      totalRank += me.rank;
+      dayRank = me.rank;
     }
+    totalRank += dayRank;
+    if (dayRank < bestRank)  bestRank  = dayRank;
+    if (dayRank > worstRank) worstRank = dayRank;
   });
 
   const avgRank  = totalRank  / played.length;
@@ -1735,18 +1747,43 @@ function renderHistoryContent(playerName, days) {
   const flooredRank = Math.floor(avgRank);
   const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : 'rank-default';
 
+  // Single-day vs par values are whole numbers; format without decimals
+  const fmtVsPar = v => v === 0 ? 'E' : (v > 0 ? '+' + v : String(v));
+  const bestVsParDisplay  = fmtVsPar(bestVsPar);
+  const worstVsParDisplay = fmtVsPar(worstVsPar);
+
   const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
   const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
   el.innerHTML = `
     <div class="history-stat-row">
-      <div class="history-stat">
-        <span class="history-stat-label">Avg Rank</span>
-        <span class="history-stat-value ${rankCls}">${avgRank.toFixed(1)}</span>
+      <div class="history-stat-col">
+        <div class="history-stat">
+          <span class="history-stat-label">Highest Rank</span>
+          <span class="history-stat-value under">${bestRank}</span>
+        </div>
+        <div class="history-stat">
+          <span class="history-stat-label">Avg Rank</span>
+          <span class="history-stat-value ${rankCls}">${avgRank.toFixed(1)}</span>
+        </div>
+        <div class="history-stat">
+          <span class="history-stat-label">Lowest Rank</span>
+          <span class="history-stat-value over">${worstRank}</span>
+        </div>
       </div>
-      <div class="history-stat">
-        <span class="history-stat-label">Avg VS Par</span>
-        <span class="history-stat-value ${vsParCls}">${vsParDisplay}</span>
+      <div class="history-stat-col">
+        <div class="history-stat">
+          <span class="history-stat-label">Best VS Par</span>
+          <span class="history-stat-value under">${bestVsParDisplay}</span>
+        </div>
+        <div class="history-stat">
+          <span class="history-stat-label">Avg VS Par</span>
+          <span class="history-stat-value ${vsParCls}">${vsParDisplay}</span>
+        </div>
+        <div class="history-stat">
+          <span class="history-stat-label">Worst VS Par</span>
+          <span class="history-stat-value over">${worstVsParDisplay}</span>
+        </div>
       </div>
     </div>
     <div class="history-played">${played.length} of ${days} days played</div>
