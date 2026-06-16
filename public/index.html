@@ -1749,8 +1749,11 @@ function renderHistoryContent(playerName, days) {
 
   // Single-day vs par values are whole numbers; format without decimals
   const fmtVsPar = v => v === 0 ? 'E' : (v > 0 ? '+' + v : String(v));
+  const vsParValCls = v => v < 0 ? 'under' : v === 0 ? 'even' : 'over';
   const bestVsParDisplay  = fmtVsPar(bestVsPar);
   const worstVsParDisplay = fmtVsPar(worstVsPar);
+  const bestVsParCls  = vsParValCls(bestVsPar);
+  const worstVsParCls = vsParValCls(worstVsPar);
 
   const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
   const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
@@ -1774,7 +1777,7 @@ function renderHistoryContent(playerName, days) {
       <div class="history-stat-col">
         <div class="history-stat">
           <span class="history-stat-label">Best VS Par</span>
-          <span class="history-stat-value under">${bestVsParDisplay}</span>
+          <span class="history-stat-value ${bestVsParCls}">${bestVsParDisplay}</span>
         </div>
         <div class="history-stat">
           <span class="history-stat-label">Avg VS Par</span>
@@ -1782,7 +1785,7 @@ function renderHistoryContent(playerName, days) {
         </div>
         <div class="history-stat">
           <span class="history-stat-label">Worst VS Par</span>
-          <span class="history-stat-value over">${worstVsParDisplay}</span>
+          <span class="history-stat-value ${worstVsParCls}">${worstVsParDisplay}</span>
         </div>
       </div>
     </div>
