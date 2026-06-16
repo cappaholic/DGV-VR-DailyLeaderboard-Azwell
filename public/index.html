@@ -307,6 +307,10 @@
     display: flex; justify-content: space-around;
     margin-bottom: 18px; gap: 8px;
   }
+  .history-stat-row + .history-stat-row { margin-top: 8px; }
+  .history-stat-col {
+    flex: 1; display: flex; flex-direction: column; gap: 8px;
+  }
   .history-stat {
     flex: 1; background: rgba(0,0,0,0.3);
     border: 1px solid var(--border); border-radius: 6px;
@@ -1626,6 +1630,14 @@ let historyLoaded     = false;
 let currentHistoryTab = 7;
 let historyExcludeCheaters = false;
 
+// All-time best/worst records only ever consider days on or after this date —
+// everything before it was captured by the pre-fix snapshot workflow and may
+// carry unverifiable seed/par errors. Averages aren't affected by this cutoff,
+// since a single bad day dilutes harmlessly into an average but would sit
+// permanently as someone's "best" or "worst" otherwise. Move this forward only
+// if you're confident a given stretch of history is fully trustworthy.
+const BEST_WORST_START_DATE = '2026-06-16';
+
 async function loadHistoryData() {
   if (historyLoaded) return;
   try {
@@ -1738,6 +1750,82 @@ function renderHistoryContent(playerName, days) {
   const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
   const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
+  // ── All-time best/worst, since BEST_WORST_START_DATE only ──────────
+  // Unlocked per-tab once that many total days exist since the cutoff —
+  // 7-day tab unlocks at 7 days of clean history, 30-day tab at 30.
+  // The values themselves span the FULL post-cutoff history, not just
+  // the most recent `days` — this grows over time rather than rolling.
+  const postCutoffDays    = historyData.filter(d => d.date >= BEST_WORST_START_DATE);
+  const bestWorstUnlocked = postCutoffDays.length >= days;
+
+  let bestWorstRowHtml = '';
+  if (bestWorstUnlocked) {
+    const postCutoffPlayed = postCutoffDays.filter(day =>
+      day.players.some(p => stripDiscTag(p.name) === playerName || p.name === playerName)
+    );
+
+    if (postCutoffPlayed.length >= 2) {
+      let bestRank = Infinity, worstRank = -Infinity;
+      let bestVsPar = Infinity, worstVsPar = -Infinity;
+
+      postCutoffPlayed.forEach(day => {
+        const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+        if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
+        if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
+
+        let dayRank;
+        if (historyExcludeCheaters) {
+          const clean = day.players
+            .filter(p => !isFlagged(stripDiscTag(p.name)))
+            .sort((a, b) => a.score - b.score);
+          const reranked = [];
+          for (let i = 0; i < clean.length; i++) {
+            if (i > 0 && clean[i].score === clean[i - 1].score) {
+              reranked.push(reranked[i - 1]);
+            } else {
+              reranked.push(i + 1);
+            }
+          }
+          const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+          dayRank = pos >= 0 ? reranked[pos] : me.rank;
+        } else {
+          dayRank = me.rank;
+        }
+        if (dayRank < bestRank)  bestRank  = dayRank;
+        if (dayRank > worstRank) worstRank = dayRank;
+      });
+
+      // Single-day vs par values are whole numbers; format without decimals
+      const fmtVsPar    = v => v === 0 ? 'E' : (v > 0 ? '+' + v : String(v));
+      const vsParValCls = v => v < 0 ? 'under' : v === 0 ? 'even' : 'over';
+
+      bestWorstRowHtml = `
+        <div class="history-stat-row">
+          <div class="history-stat-col">
+            <div class="history-stat">
+              <span class="history-stat-label">Highest Rank</span>
+              <span class="history-stat-value under">${bestRank}</span>
+            </div>
+            <div class="history-stat">
+              <span class="history-stat-label">Lowest Rank</span>
+              <span class="history-stat-value over">${worstRank}</span>
+            </div>
+          </div>
+          <div class="history-stat-col">
+            <div class="history-stat">
+              <span class="history-stat-label">Best VS Par</span>
+              <span class="history-stat-value ${vsParValCls(bestVsPar)}">${fmtVsPar(bestVsPar)}</span>
+            </div>
+            <div class="history-stat">
+              <span class="history-stat-label">Worst VS Par</span>
+              <span class="history-stat-value ${vsParValCls(worstVsPar)}">${fmtVsPar(worstVsPar)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
   el.innerHTML = `
     <div class="history-stat-row">
       <div class="history-stat">
@@ -1749,6 +1837,7 @@ function renderHistoryContent(playerName, days) {
         <span class="history-stat-value ${vsParCls}">${vsParDisplay}</span>
       </div>
     </div>
+    ${bestWorstRowHtml}
     <div class="history-played">${played.length} of ${days} days played</div>
     <div style="text-align:center; margin-top:10px;">
       <button class="${btnCls}" onclick="toggleHistoryCheaters()">${btnLabel}</button>
