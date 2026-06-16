@@ -2,6 +2,12 @@ name: Snapshot Daily Leaderboard
 
 on:
   workflow_dispatch: # Triggered by cron-job.org via /api/trigger-snapshot or manually
+    inputs:
+      force:
+        description: 'Run even outside the normal 23:30–23:59 UTC snapshot window'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   snapshot:
@@ -13,6 +19,23 @@ jobs:
 
       - name: Fetch and save leaderboard snapshot
         run: |
+          # ── Time-window guard ──────────────────────────────────────
+          # The live leaderboard resets at 00:00 UTC. This snapshot is only
+          # valid if it runs in the narrow window just before that reset
+          # (cron-job.org targets 23:58 UTC). Running outside that window —
+          # e.g. an accidental manual trigger mid-day — would capture the
+          # WRONG day's data and silently corrupt history.json. Skip unless
+          # we're in the window, or the run was explicitly forced.
+          FORCE="${{ github.event.inputs.force }}"
+          CURRENT_HOUR=$(date -u +%H)
+          CURRENT_MIN=$(date -u +%M)
+          if [ "$FORCE" != "true" ]; then
+            if [ "$CURRENT_HOUR" != "23" ] || [ "$CURRENT_MIN" -lt 30 ]; then
+              echo "::warning::Snapshot skipped — current UTC time ($CURRENT_HOUR:$CURRENT_MIN) is outside the expected 23:30-23:59 UTC window. This guard exists to prevent accidentally overwriting today's data with a mid-day snapshot. Re-run manually with the 'force' input checked if this was intentional."
+              exit 0
+            fi
+          fi
+
           # ── Config ──────────────────────────────────────────────────
           VERCEL_URL="https://dgv-vr-daily-leaderboard-azwell.vercel.app"
           PROJECT_ID="22c95154-2fe0-4923-8792-e2fe16880302"
@@ -53,7 +76,7 @@ jobs:
 
           # Fetch remaining pages if needed and merge all results
           python3 << EOF
-          import json, urllib.request, math, re
+          import json, urllib.request, math, re, time
           from datetime import datetime, timezone
 
           access_token = "$ACCESS_TOKEN"
@@ -82,17 +105,28 @@ jobs:
             else:
               ranks.append(i + 1)
 
-          # ── Fetch daily seed from CloudSave ──────────────────────
-          seed_value = None
-          try:
+          # ── Fetch daily seed from CloudSave, twice, to catch a reset race ──
+          def fetch_seed():
             seed_url = f"{vercel_url}/api/cloudsave/v1/data/projects/{project_id}/custom/dailySeed/items"
             req = urllib.request.Request(seed_url, headers={"Authorization": f"Bearer {access_token}"})
             with urllib.request.urlopen(req) as r:
               seed_data = json.loads(r.read())
-              seed_entry = next((x for x in seed_data.get("results", []) if x["key"] == "seed"), None)
-              if seed_entry:
-                seed_value = int(seed_entry["value"])
-                print(f"Seed fetched: {seed_value}")
+            seed_entry = next((x for x in seed_data.get("results", []) if x["key"] == "seed"), None)
+            return int(seed_entry["value"]) if seed_entry else None
+
+          seed_value    = None
+          seed_unstable = False
+          try:
+            first_seed = fetch_seed()
+            time.sleep(5)
+            second_seed = fetch_seed()
+            if first_seed == second_seed:
+              seed_value = first_seed
+              print(f"Seed fetched: {seed_value} (stable across two reads 5s apart)")
+            else:
+              seed_unstable = True
+              seed_value = second_seed
+              print(f"::warning::Seed changed between reads ({first_seed} -> {second_seed}) — likely caught a reset in progress. Using the second (later) reading: {seed_value}, but flagging this day as seed-unstable.")
           except Exception as e:
             print(f"Seed fetch failed: {e}")
 
@@ -116,78 +150,132 @@ jobs:
 
           today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-          # Compute vs par from seed if available
-          def compute_vs_par(score, seed):
-            if seed is None:
-              return None
-            # Minimal LCG matching the JS generateLayout logic
-            # We can't replicate the full JS layout here, so store raw score
-            # and let the front-end compute vs par from history if needed.
-            # For now store the raw score; vsPar will be filled in below.
-            return None
-
           # Build per-player history entries using ranks we already computed
           history_players = []
           for i, entry in enumerate(all_results):
             raw_score = entry.get("score", 0)
             rank      = ranks[i]
-            # vs par: if we have seed, we'd need to replicate JS layout math.
-            # Store raw score; front-end already knows par from seed in history entry.
             history_players.append({
               "name":   strip_disc_tag(entry.get("playerName", "Anonymous")),
               "rank":   rank,
               "score":  raw_score,
-              "vsPar":  None   # filled below if seed available
+              "vsPar":  None   # filled below if seed/par available
             })
 
-          # Compute total par from seed using the same LCG as the JS front-end
-          total_par = None
+          # ── Compute total par from seed — exact port of index.html's ──
+          # ── SystemRandom (C# Knuth subtractive generator) + COURSES ───
+          MBIG  = 2147483647
+          MSEED = 161803398
+
+          class SystemRandom:
+            def __init__(self, seed):
+              sa = [0] * 56
+              mj = MSEED - abs(seed)
+              if mj < 0:
+                mj += MBIG
+              sa[55] = mj
+              mk = 1
+              for i in range(1, 55):
+                ii = (21 * i) % 55
+                sa[ii] = mk
+                mk = mj - mk
+                if mk < 0:
+                  mk += MBIG
+                mj = sa[ii]
+              for k in range(1, 5):
+                for i in range(1, 56):
+                  n = i + 30
+                  if n >= 55:
+                    n -= 55
+                  sa[i] -= sa[1 + n]
+                  if sa[i] < 0:
+                    sa[i] += MBIG
+              self.sa = sa
+              self.inext  = 0
+              self.inextp = 21
+
+            def _internal_sample(self):
+              li = self.inext
+              lp = self.inextp
+              li += 1
+              if li >= 56:
+                li = 1
+              lp += 1
+              if lp >= 56:
+                lp = 1
+              v = self.sa[li] - self.sa[lp]
+              if v == MBIG:
+                v -= 1
+              if v < 0:
+                v += MBIG
+              self.sa[li] = v
+              self.inext  = li
+              self.inextp = lp
+              return v
+
+            def next(self):
+              return self._internal_sample()
+
+            def next_range(self, lo, hi):
+              rng = hi - lo
+              if rng <= 1:
+                return lo
+              return lo + int((self._internal_sample() / 2147483647.0) * rng)
+
+          # Exact copy of the COURSES table in index.html — keep these two
+          # in sync any time courses/holes change on the front end.
+          COURSES = [
+            {"name": "Sunshine Glade",    "holes": [3,3,3,3,4]},
+            {"name": "Blueberry Thicket", "holes": [3,3,4,3,3,3,3,3,3]},
+            {"name": "Oak Hill",          "holes": [4,3,4,4,4,4,4,4,3]},
+            {"name": "Lakeside",          "holes": [3,4,3,5,4,3,3,3,5]},
+            {"name": "Windswept Fields",  "holes": [3,4,4,3,4,3,3,3,3]},
+            {"name": "Harrowing Woods",   "holes": [3,3,3,3,4,4,3,4,5]},
+            {"name": "The Crows Nest",    "holes": [3,3,4,4,3,3,4,3,4]},
+            {"name": "Grizzly Gulch",     "holes": [3,3,4,3,4,4,3,4,3]},
+          ]
+
+          # Mathematically exact bounds given the COURSES data above —
+          # any computed par outside this range is provably impossible.
+          PAR_MIN, PAR_MAX = 27, 39
+
+          def generate_layout_par(seed):
+            rng  = SystemRandom(seed)
+            pool = list(range(len(COURSES)))
+            selected = []
+            for _ in range(3):
+              idx = rng.next_range(0, len(pool))
+              selected.append(pool.pop(idx))
+
+            total = 0
+            for course_idx in selected:
+              holes = COURSES[course_idx]["holes"]
+              keyed = [(i, par, rng.next()) for i, par in enumerate(holes)]
+              keyed.sort(key=lambda x: x[2])
+              total += sum(par for (_, par, _) in keyed[:3])
+            return total
+
+          total_par   = None
+          par_suspect = False
           if seed_value is not None:
             try:
-              # Replicate JS generateLayout LCG to get total par
-              COURSES = [
-                {"name":"Sunshine Glade",    "holes":[4,4,4,5,5]},
-                {"name":"Blueberry Thicket", "holes":[3,3,4,3,4,3,3,3,3]},
-                {"name":"Oak Hill",          "holes":[5,3,5,5,5,4,5,5,4]},
-                {"name":"Lakeside",          "holes":[3,4,3,4,5,3,3,3,5]},
-                {"name":"Windswept Fields",  "holes":[3,4,4,4,4,3,3,3,3]},
-                {"name":"Harrowing Woods",   "holes":[3,3,3,3,3,4,3,4,5]},
-                {"name":"Crows Nest",        "holes":[3,3,3,3,5,3,3,3,4]},
-                {"name":"Grizzly Gulch",     "holes":[3,3,3,3,4,4,4,4,3]},
-              ]
-              seed = seed_value
-              def lcg_next(s):
-                return (s * 1664525 + 1013904223) & 0xFFFFFFFF
-              def lcg_range(s, n):
-                s = lcg_next(s)
-                return s, s % n
-
-              selected = []
-              s = seed
-              course_indices = list(range(len(COURSES)))
-              for _ in range(3):
-                s, idx = lcg_range(s, len(course_indices))
-                selected.append(course_indices.pop(idx))
-
-              total_par = 0
-              for ci, course_idx in enumerate(selected):
-                course = COURSES[course_idx]
-                hole_indices = list(range(len(course["holes"])))
-                for _ in range(3):
-                  s, hi = lcg_range(s, len(hole_indices))
-                  total_par += course["holes"][hole_indices.pop(hi)]
-
+              total_par = generate_layout_par(seed_value)
               print(f"Computed total par from seed: {total_par}")
+              if not (PAR_MIN <= total_par <= PAR_MAX):
+                par_suspect = True
+                print(f"::warning::Computed par ({total_par}) is outside the theoretically possible range ({PAR_MIN}-{PAR_MAX}). Flagging this day as par-suspect.")
               for p in history_players:
                 p["vsPar"] = p["score"] - total_par
             except Exception as e:
               print(f"Par computation failed: {e}")
 
           history_entry = {
-            "date":    today_str,
-            "seed":    seed_value,
-            "par":     total_par,
-            "players": history_players
+            "date":         today_str,
+            "seed":         seed_value,
+            "par":          total_par,
+            "seedUnstable": seed_unstable,
+            "parSuspect":   par_suspect,
+            "players":      history_players
           }
 
           # Load existing history, append, save
