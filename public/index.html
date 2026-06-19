@@ -348,6 +348,20 @@
   }
   .history-close-btn:hover { color: var(--white); border-color: var(--white); }
 
+  .history-meta-btn {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--white); border-radius: 4px;
+    padding: 5px 0; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    text-decoration: none;
+    width: 100%; text-align: center;
+    margin-bottom: 16px;
+  }
+  .history-meta-btn:hover { border-color: var(--white); background: rgba(237,246,255,0.06); }
+
   /* ── Config card ── */
   .card {
     background: var(--card);
@@ -1658,6 +1672,11 @@ function openHistoryModal(playerName) {
   historyExcludeCheaters = false;
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
+
+  // Wire up the Meta Profile button
+  const metaBtn = document.getElementById('historyMetaBtn');
+  metaBtn.href = 'https://www.meta.com/profile/' + encodeURIComponent(playerName) + '/';
+
   if (isFlagged(playerName)) {
     document.getElementById('tab7').classList.remove('active');
     document.getElementById('tab30').classList.remove('active');
@@ -2171,6 +2190,9 @@ window.addEventListener('resize', applyMarquee);
   <div class="history-overlay" id="historyOverlay" onclick="handleOverlayClick(event)">
     <div class="history-modal">
       <div class="history-modal-name" id="historyPlayerName">—</div>
+      <div style="text-align:center; margin-bottom:16px;">
+        <a class="history-meta-btn" id="historyMetaBtn" href="#" target="_blank" rel="noopener noreferrer">Meta Profile</a>
+      </div>
       <div class="history-tab-row">
         <button class="history-tab active" id="tab7"  onclick="switchHistoryTab(7)">7 Day</button>
         <button class="history-tab"        id="tab30" onclick="switchHistoryTab(30)">30 Day</button>
