@@ -1672,10 +1672,18 @@ function openHistoryModal(playerName) {
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
 
-  // Use a <button> + window.open instead of <a> to bypass iOS Universal Link hijacking
+  // On iOS, navigator.share() opens the native share sheet where the user can pick
+  // "Open in Safari", bypassing the Meta app's Universal Link interception.
+  // On desktop/Android, fall back to window.open().
   const metaBtn = document.getElementById('historyMetaBtn');
   const metaUrl = 'https://horizon.meta.com/profile/' + encodeURIComponent(playerName) + '/';
-  metaBtn.onclick = function() { window.open(metaUrl, '_blank', 'noopener,noreferrer'); };
+  metaBtn.onclick = function() {
+    if (navigator.share) {
+      navigator.share({ title: playerName + ' — Meta Profile', url: metaUrl }).catch(() => {});
+    } else {
+      window.open(metaUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   if (isFlagged(playerName)) {
     document.getElementById('tab7').classList.remove('active');
