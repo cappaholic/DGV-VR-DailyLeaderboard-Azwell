@@ -348,25 +348,6 @@
   }
   .history-close-btn:hover { color: var(--white); border-color: var(--white); }
 
-  .history-meta-btn {
-    display: inline-block; width: calc(50% - 4px);
-    font-family: 'DM Mono', monospace;
-    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
-    background: transparent; border: 1px solid var(--border);
-    color: var(--white); border-radius: 4px;
-    padding: 5px 0; cursor: pointer;
-    transition: color 0.15s, border-color 0.15s, background 0.15s;
-    text-decoration: none; text-align: center;
-    margin-bottom: 4px;
-  }
-  .history-meta-btn:hover { border-color: var(--white); background: rgba(237,246,255,0.06); }
-  .history-meta-btn.copied { border-color: var(--accent); color: var(--accent); }
-  .history-meta-hint {
-    font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.5px;
-    color: var(--muted); text-align: center; margin-bottom: 14px;
-    text-transform: uppercase;
-  }
-
   /* ── Config card ── */
   .card {
     background: var(--card);
@@ -1677,30 +1658,6 @@ function openHistoryModal(playerName) {
   historyExcludeCheaters = false;
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
-
-  // Copy profile URL to clipboard — bypasses iOS Meta app Universal Link interception entirely
-  const metaBtn = document.getElementById('historyMetaBtn');
-  const metaHint = document.getElementById('historyMetaHint');
-  const metaUrl = 'https://horizon.meta.com/profile/' + encodeURIComponent(playerName) + '/';
-  metaBtn.textContent = 'Meta Profile';
-  metaBtn.classList.remove('copied');
-  metaHint.textContent = 'tap to copy link — paste in safari';
-  metaBtn.onclick = function() {
-    navigator.clipboard.writeText(metaUrl).then(function() {
-      metaBtn.textContent = 'Copied!';
-      metaBtn.classList.add('copied');
-      metaHint.textContent = 'paste in safari to open profile';
-      setTimeout(function() {
-        metaBtn.textContent = 'Meta Profile';
-        metaBtn.classList.remove('copied');
-        metaHint.textContent = 'tap to copy link — paste in safari';
-      }, 3000);
-    }).catch(function() {
-      // Clipboard API unavailable — fall back to window.open
-      window.open(metaUrl, '_blank', 'noopener,noreferrer');
-    });
-  };
-
   if (isFlagged(playerName)) {
     document.getElementById('tab7').classList.remove('active');
     document.getElementById('tab30').classList.remove('active');
@@ -2214,10 +2171,6 @@ window.addEventListener('resize', applyMarquee);
   <div class="history-overlay" id="historyOverlay" onclick="handleOverlayClick(event)">
     <div class="history-modal">
       <div class="history-modal-name" id="historyPlayerName">—</div>
-      <div style="text-align:center;">
-        <button class="history-meta-btn" id="historyMetaBtn">Meta Profile</button>
-        <div class="history-meta-hint" id="historyMetaHint">tap to copy link — paste in safari</div>
-      </div>
       <div class="history-tab-row">
         <button class="history-tab active" id="tab7"  onclick="switchHistoryTab(7)">7 Day</button>
         <button class="history-tab"        id="tab30" onclick="switchHistoryTab(30)">30 Day</button>
