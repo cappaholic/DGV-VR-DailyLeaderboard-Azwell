@@ -1672,9 +1672,10 @@ function openHistoryModal(playerName) {
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
 
-  // Use Google "I'm Feeling Lucky" to bypass Meta app deep-link hijacking on mobile
+  // Use a <button> + window.open instead of <a> to bypass iOS Universal Link hijacking
   const metaBtn = document.getElementById('historyMetaBtn');
-  metaBtn.href = 'https://www.google.com/search?btnI=1&q=site:horizon.meta.com/profile/' + encodeURIComponent(playerName);
+  const metaUrl = 'https://horizon.meta.com/profile/' + encodeURIComponent(playerName) + '/';
+  metaBtn.onclick = function() { window.open(metaUrl, '_blank', 'noopener,noreferrer'); };
 
   if (isFlagged(playerName)) {
     document.getElementById('tab7').classList.remove('active');
@@ -2190,7 +2191,7 @@ window.addEventListener('resize', applyMarquee);
     <div class="history-modal">
       <div class="history-modal-name" id="historyPlayerName">—</div>
       <div style="text-align:center;">
-        <a class="history-meta-btn" id="historyMetaBtn" href="#" target="_blank" rel="noopener noreferrer">Meta Profile</a>
+        <button class="history-meta-btn" id="historyMetaBtn">Meta Profile</button>
       </div>
       <div class="history-tab-row">
         <button class="history-tab active" id="tab7"  onclick="switchHistoryTab(7)">7 Day</button>
