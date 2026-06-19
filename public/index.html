@@ -1672,9 +1672,9 @@ function openHistoryModal(playerName) {
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
 
-  // Wire up the Meta Profile button
+  // Use Google "I'm Feeling Lucky" to bypass Meta app deep-link hijacking on mobile
   const metaBtn = document.getElementById('historyMetaBtn');
-  metaBtn.href = 'https://horizon.meta.com/profile/' + encodeURIComponent(playerName) + '/?openExternalBrowser=1';
+  metaBtn.href = 'https://www.google.com/search?btnI=1&q=site:horizon.meta.com/profile/' + encodeURIComponent(playerName);
 
   if (isFlagged(playerName)) {
     document.getElementById('tab7').classList.remove('active');
