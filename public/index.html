@@ -1674,7 +1674,7 @@ function openHistoryModal(playerName) {
 
   // Wire up the Meta Profile button
   const metaBtn = document.getElementById('historyMetaBtn');
-  metaBtn.href = 'https://horizon.meta.com/profile/' + encodeURIComponent(playerName) + '/';
+  metaBtn.href = 'https://horizon.meta.com/profile/' + encodeURIComponent(playerName) + '/?openExternalBrowser=1';
 
   if (isFlagged(playerName)) {
     document.getElementById('tab7').classList.remove('active');
