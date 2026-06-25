@@ -1750,80 +1750,74 @@ function renderHistoryContent(playerName, days) {
   const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
   const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
-  // ── All-time best/worst, since BEST_WORST_START_DATE only ──────────
-  // Unlocked per-tab once that many total days exist since the cutoff —
-  // 7-day tab unlocks at 7 days of clean history, 30-day tab at 30.
-  // The values themselves span the FULL post-cutoff history, not just
-  // the most recent `days` — this grows over time rather than rolling.
-  const postCutoffDays    = historyData.filter(d => d.date >= BEST_WORST_START_DATE);
-  const bestWorstUnlocked = postCutoffDays.length >= days;
+  // ── Best/worst — same window as averages (7 or 30 days) ───────────
+  // Uses the same `played` dataset as the averages above, but filtered
+  // to post-cutoff dates only. Only unlocks once ALL days in the window
+  // are post-cutoff (i.e. postCutoffPlayed fills the full `days` window),
+  // ensuring best/worst is never influenced by pre-fix data.
+  const postCutoffPlayed  = played.filter(d => d.date >= BEST_WORST_START_DATE);
+  const bestWorstUnlocked = postCutoffPlayed.length >= days;
 
   let bestWorstRowHtml = '';
   if (bestWorstUnlocked) {
-    const postCutoffPlayed = postCutoffDays.filter(day =>
-      day.players.some(p => stripDiscTag(p.name) === playerName || p.name === playerName)
-    );
+    let bestRank = Infinity, worstRank = -Infinity;
+    let bestVsPar = Infinity, worstVsPar = -Infinity;
 
-    if (postCutoffPlayed.length >= 2) {
-      let bestRank = Infinity, worstRank = -Infinity;
-      let bestVsPar = Infinity, worstVsPar = -Infinity;
+    postCutoffPlayed.forEach(day => {
+      const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+      if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
+      if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
 
-      postCutoffPlayed.forEach(day => {
-        const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-        if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
-        if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
-
-        let dayRank;
-        if (historyExcludeCheaters) {
-          const clean = day.players
-            .filter(p => !isFlagged(stripDiscTag(p.name)))
-            .sort((a, b) => a.score - b.score);
-          const reranked = [];
-          for (let i = 0; i < clean.length; i++) {
-            if (i > 0 && clean[i].score === clean[i - 1].score) {
-              reranked.push(reranked[i - 1]);
-            } else {
-              reranked.push(i + 1);
-            }
+      let dayRank;
+      if (historyExcludeCheaters) {
+        const clean = day.players
+          .filter(p => !isFlagged(stripDiscTag(p.name)))
+          .sort((a, b) => a.score - b.score);
+        const reranked = [];
+        for (let i = 0; i < clean.length; i++) {
+          if (i > 0 && clean[i].score === clean[i - 1].score) {
+            reranked.push(reranked[i - 1]);
+          } else {
+            reranked.push(i + 1);
           }
-          const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-          dayRank = pos >= 0 ? reranked[pos] : me.rank;
-        } else {
-          dayRank = me.rank;
         }
-        if (dayRank < bestRank)  bestRank  = dayRank;
-        if (dayRank > worstRank) worstRank = dayRank;
-      });
+        const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+        dayRank = pos >= 0 ? reranked[pos] : me.rank;
+      } else {
+        dayRank = me.rank;
+      }
+      if (dayRank < bestRank)  bestRank  = dayRank;
+      if (dayRank > worstRank) worstRank = dayRank;
+    });
 
-      // Single-day vs par values are whole numbers; format without decimals
-      const fmtVsPar    = v => v === 0 ? 'E' : (v > 0 ? '+' + v : String(v));
-      const vsParValCls = v => v < 0 ? 'under' : v === 0 ? 'even' : 'over';
+    // Single-day vs par values are whole numbers; format without decimals
+    const fmtVsPar    = v => v === 0 ? 'E' : (v > 0 ? '+' + v : String(v));
+    const vsParValCls = v => v < 0 ? 'under' : v === 0 ? 'even' : 'over';
 
-      bestWorstRowHtml = `
-        <div class="history-stat-row">
-          <div class="history-stat-col">
-            <div class="history-stat">
-              <span class="history-stat-label">Highest Rank</span>
-              <span class="history-stat-value under">${bestRank}</span>
-            </div>
-            <div class="history-stat">
-              <span class="history-stat-label">Lowest Rank</span>
-              <span class="history-stat-value over">${worstRank}</span>
-            </div>
+    bestWorstRowHtml = `
+      <div class="history-stat-row">
+        <div class="history-stat-col">
+          <div class="history-stat">
+            <span class="history-stat-label">Highest Rank</span>
+            <span class="history-stat-value under">${bestRank}</span>
           </div>
-          <div class="history-stat-col">
-            <div class="history-stat">
-              <span class="history-stat-label">Best VS Par</span>
-              <span class="history-stat-value ${vsParValCls(bestVsPar)}">${fmtVsPar(bestVsPar)}</span>
-            </div>
-            <div class="history-stat">
-              <span class="history-stat-label">Worst VS Par</span>
-              <span class="history-stat-value ${vsParValCls(worstVsPar)}">${fmtVsPar(worstVsPar)}</span>
-            </div>
+          <div class="history-stat">
+            <span class="history-stat-label">Lowest Rank</span>
+            <span class="history-stat-value over">${worstRank}</span>
           </div>
         </div>
-      `;
-    }
+        <div class="history-stat-col">
+          <div class="history-stat">
+            <span class="history-stat-label">Best VS Par</span>
+            <span class="history-stat-value ${vsParValCls(bestVsPar)}">${fmtVsPar(bestVsPar)}</span>
+          </div>
+          <div class="history-stat">
+            <span class="history-stat-label">Worst VS Par</span>
+            <span class="history-stat-value ${vsParValCls(worstVsPar)}">${fmtVsPar(worstVsPar)}</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   el.innerHTML = `
