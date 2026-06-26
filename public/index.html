@@ -1753,11 +1753,11 @@ function renderHistoryContent(playerName, days) {
 
   // ── Best/worst — same window as averages (7 or 30 days) ───────────
   // Uses the same `played` dataset as the averages above, but filtered
-  // to post-cutoff dates only. Only unlocks once ALL days in the window
-  // are post-cutoff (i.e. postCutoffPlayed fills the full `days` window),
-  // ensuring best/worst is never influenced by pre-fix data.
+  // to post-cutoff dates only. Unlocks once the player has at least 2
+  // post-cutoff days in the window — enough for a meaningful best AND worst.
+  // Missing days don't lock out the stat; all data used is still post-cutoff.
   const postCutoffPlayed  = played.filter(d => d.date >= BEST_WORST_START_DATE);
-  const bestWorstUnlocked = postCutoffPlayed.length >= days;
+  const bestWorstUnlocked = postCutoffPlayed.length >= 2;
 
   let bestWorstRowHtml = '';
   if (bestWorstUnlocked) {
