@@ -1005,18 +1005,18 @@ function updateYesterdayBtn() {
     cheaterFilterBtn.style.display = '';
   }
 
-  // Handicap button lives in lb-header — show only when data threshold is met
+  // Handicap button lives in lb-header — show only when at least one player
+  // has a valid computed handicap index (i.e. meets HANDICAP_MIN_DAYS threshold)
   if (handicapBtn) {
     const hasEnoughData = historyData && historyData.length > 0 &&
       (() => {
-        const counts = {};
+        const names = new Set();
         historyData.forEach(day => {
           day.players.forEach(p => {
-            const name = stripDiscTag(p.name).toLowerCase();
-            if (!isFlagged(stripDiscTag(p.name))) counts[name] = (counts[name] || 0) + 1;
+            if (!isFlagged(stripDiscTag(p.name))) names.add(stripDiscTag(p.name));
           });
         });
-        return Object.values(counts).some(c => c >= 30);
+        return [...names].some(name => computeHandicapIndex(name) !== null);
       })();
     handicapBtn.style.display = hasEnoughData ? '' : 'none';
     handicapBtn.classList.toggle('handicap-active', viewingHandicap);
