@@ -333,6 +333,18 @@
   .history-stat-value.silver { color: var(--silver); }
   .history-stat-value.bronze { color: var(--bronze); }
   .history-stat-value.rank-default { color: #eaeaea; }
+  .history-stat-value.accent2 { color: var(--accent2); text-shadow: 0 0 16px rgba(46,207,170,0.35); }
+
+  .dgv-rating-row {
+    background: rgba(46,207,170,0.06);
+    border: 1px solid rgba(46,207,170,0.2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
   .history-played {
     font-size: 10px; color: var(--muted); letter-spacing: 1px;
     text-transform: uppercase; margin-bottom: 20px;
@@ -499,15 +511,7 @@
 
   .refresh-btn:hover { border-color: var(--green-neon); color: var(--green-neon); }
 
-  .refresh-btn.handicap-active {
-    border-color: var(--accent2); color: var(--accent2);
-  }
-  .refresh-btn.handicap-active:hover { border-color: var(--accent2); color: var(--accent2); }
 
-  .lb-row.handicap-unranked { opacity: 0.38; }
-
-  #handicapBtn:hover { color: var(--white) !important; border-color: var(--white) !important; }
-  #handicapBtn.handicap-active { color: var(--accent2) !important; border-color: var(--accent2) !important; }
 
 
 
@@ -516,7 +520,7 @@
   }
   .lb-header {
     display: grid;
-    grid-template-columns: 64px 1fr 160px 100px;
+    grid-template-columns: 64px 1fr 120px 100px;
     padding: 14px 20px;
     background: var(--surface); border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 2;
@@ -528,10 +532,18 @@
   }
   .lb-header span:nth-child(3),
   .lb-header span:nth-child(4) { text-align: right; }
+  .lb-header span:nth-child(5) { text-align: right; }
+
+  /* Yesterday mode: 5-column layout with Round Rating after Strokes */
+  .lb-header.yesterday-cols,
+  .lb-row.yesterday-cols {
+    grid-template-columns: 64px 1fr 120px 100px 110px;
+  }
+  .lb-header.yesterday-cols span:nth-child(5) { text-align: right; }
 
   .lb-row {
     display: grid;
-    grid-template-columns: 64px 1fr 160px 100px;
+    grid-template-columns: 64px 1fr 120px 100px;
     padding: 12px 20px;
     border-bottom: 1px solid rgba(30,61,85,0.7);
     align-items: center; transition: background 0.15s;
@@ -624,7 +636,8 @@
   .score-cell { text-align: right; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; align-self: stretch; }
 
   @media (max-width: 600px) {
-    .lb-header, .lb-row { grid-template-columns: 48px 1fr 100px 72px; padding: 10px 12px; align-items: end; }
+    .lb-header, .lb-row { grid-template-columns: 48px 1fr 90px 65px; padding: 10px 12px; align-items: end; }
+    .lb-header.yesterday-cols, .lb-row.yesterday-cols { grid-template-columns: 48px 1fr 70px 55px 72px; }
     .lb-row .score-cell { justify-content: flex-end; }
     .score-vs-par { font-size: 20px; }
   }
@@ -873,14 +886,12 @@
       Viewing Yesterday's Leaderboard
     </div>
     <div class="leaderboard">
-      <div class="lb-header" style="position:relative;">
+      <div class="lb-header" id="lbHeader">
         <span>Rank</span>
         <span>Player</span>
-        <span style="display:contents;">
-          <button class="refresh-btn" id="handicapBtn" onclick="toggleHandicapLeaderboard()" style="position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap;">Handicap Scores</button>
-        </span>
         <span style="text-align:right; white-space:nowrap; display:block;" id="vsParHeader">VS Par</span>
         <span style="text-align:right">Strokes</span>
+        <span style="text-align:right; white-space:nowrap; display:block; color:var(--accent2);">Round Rating</span>
       </div>
       <div id="lbRows"></div>
       </div>
@@ -966,7 +977,6 @@ let yesterdaySnapshot = null;
 let distUnit = 'ft'; // 'ft' or 'm'
 let viewingYesterday  = false;
 let cheatersHidden    = false;
-let viewingHandicap   = false;
 
 async function loadYesterdaySnapshot() {
   try {
@@ -988,7 +998,6 @@ function updateYesterdayBtn() {
   const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
   const cheaterBtn        = document.getElementById('cheaterFilterBtn');
   const cheaterCenter     = document.getElementById('cheaterFilterCenter');
-  const handicapBtn       = document.getElementById('handicapBtn');
   if (!yesterdayBtn) return;
 
   // Keep label synced to shared state
@@ -999,35 +1008,13 @@ function updateYesterdayBtn() {
   // Manage center button group visibility
   const cheaterFilterBtn = document.getElementById('cheaterFilterBtn');
   if (cheaterCenter) {
-    cheaterCenter.style.display = viewingHandicap ? 'none' : '';
+    cheaterCenter.style.display = '';
   }
   if (cheaterFilterBtn) {
     cheaterFilterBtn.style.display = '';
   }
 
-  // Handicap button lives in lb-header — show only when at least one player
-  // has a valid computed handicap index (i.e. meets HANDICAP_MIN_DAYS threshold)
-  if (handicapBtn) {
-    const hasEnoughData = historyData && historyData.length > 0 &&
-      (() => {
-        const names = new Set();
-        historyData.forEach(day => {
-          day.players.forEach(p => {
-            if (!isFlagged(stripDiscTag(p.name))) names.add(stripDiscTag(p.name));
-          });
-        });
-        return [...names].some(name => computeHandicapIndex(name) !== null);
-      })();
-    handicapBtn.style.display = hasEnoughData ? '' : 'none';
-    handicapBtn.classList.toggle('handicap-active', viewingHandicap);
-  }
-
-  // Handicap button lives in the lb-header — just toggle active state
-  if (handicapBtn) {
-    handicapBtn.classList.toggle('handicap-active', viewingHandicap);
-  }
-
-  if (viewingYesterday || viewingHandicap) {
+  if (viewingYesterday) {
     const w = todayViewBtns.offsetWidth;
     todayViewBtns.style.display     = 'none';
     yesterdayViewBtns.style.display = '';
@@ -1066,6 +1053,7 @@ function toggleYesterdayLeaderboard() {
     viewingYesterday = true;
     renderSnapshotLeaderboard(yesterdaySnapshot);
     document.getElementById('yesterdayBanner').style.display = '';
+    document.getElementById('lbHeader').classList.add('yesterday-cols');
     // Switch layout labels and border color to yesterday mode
     document.querySelector('#layoutStrip .layout-section-label').textContent = "Yesterday's Courses";
     document.querySelector('#scorecardSection .layout-section-label').textContent = "Yesterday's Layout";
@@ -1082,8 +1070,8 @@ function toggleYesterdayLeaderboard() {
 
 function showTodayLeaderboard() {
   viewingYesterday = false;
-  viewingHandicap  = false;
   document.getElementById('yesterdayBanner').style.display = 'none';
+  document.getElementById('lbHeader').classList.remove('yesterday-cols');
   document.querySelector('#layoutStrip .layout-section-label').textContent = "Today's Courses";
   document.querySelector('#scorecardSection .layout-section-label').textContent = "Today's Layout";
   document.getElementById('layoutStrip').classList.remove('yesterday-mode');
@@ -1150,8 +1138,21 @@ function renderSnapshotLeaderboard(snap) {
                       : topNerd  ? `<img class="nerd-badge" src="dgvr_nerd_gold.png" alt="DGV VR Nerd Gold">`
                       : nerd     ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
                       : '';
+    // Yesterday round rating: fixed 4.5pts + propagator difficulty offset for that date
+    // Derive yesterday's date from UTC (reset is at 00:00 UTC)
+    const yPar    = seededPar || 31;
+    const yVsPar  = rawScore - yPar;
+    const _yNow   = new Date();
+    const _yUTC   = new Date(Date.UTC(_yNow.getUTCFullYear(), _yNow.getUTCMonth(), _yNow.getUTCDate()));
+    const _yDate  = new Date(_yUTC.getTime() - 86400000).toISOString().slice(0, 10);
+    const yDate   = yesterdaySnapshot && yesterdaySnapshot.date ? yesterdaySnapshot.date : _yDate;
+    const yDiff   = dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
+    const yRR     = flagged ? null : Math.round(1000 - (yVsPar - yDiff) * RATING_PTS);
+    const yrDisplay = yRR !== null
+      ? `<div class="score-vs-par" style="font-size:18px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
+      : `<div class="score-vs-par even" style="font-size:14px;color:var(--muted);">—</div>`;
     return `
-      <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
+      <div class="${rowCls} yesterday-cols" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
         <div class="rank ${flagged ? '' : rankCls}">${rankDisplay}</div>
         <div class="player-name-wrap"><div class="player-name" onclick="openHistoryModal('${escapeHtml(playerName)}')" style="cursor:pointer">${escapeHtml(playerName)}</div></div>
@@ -1163,6 +1164,7 @@ function renderSnapshotLeaderboard(snap) {
           <div class="score-vs-par even" style="font-size:20px">${rawScore}</div>
           <div class="score-raw">total strokes</div>
         </div>
+        <div class="score-cell">${yrDisplay}</div>
       </div>
     `;
   }).join('');
@@ -1648,6 +1650,7 @@ async function loadHistoryData() {
     historyData = [];
   }
   historyLoaded = true;
+  invalidateRatingCache();
   updateYesterdayBtn();
 }
 
@@ -1821,7 +1824,41 @@ function renderHistoryContent(playerName, days) {
     `;
   }
 
+  // ── DGV VR Rating ─────────────────────────────────────────────────
+  let ratingRowHtml = '';
+  if (historyData && historyData.length > 0) {
+    const allRatings = buildAllRatings(historyData);
+    const playerRatingData = allRatings[playerName];
+    if (playerRatingData) {
+      const { rating, provisional, bestRound, worstRound } = playerRatingData;
+      const provBadge = provisional
+        ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;display:block;margin-top:2px;">Provisional</span>`
+        : '';
+      // Color tier: 1050+ gold, 1030+ accent2, 1000+ white, under 1000 muted
+      const ratingCls = rating >= 1050 ? 'gold' : rating >= 1030 ? 'accent2' : rating >= 1000 ? 'even' : 'rank-default';
+      ratingRowHtml = `
+        <div class="history-stat-row dgv-rating-row">
+          <div class="history-stat" style="flex:1;">
+            <span class="history-stat-label">DGV VR Rating</span>
+            <span class="history-stat-value ${ratingCls}" style="font-size:32px;">${rating}</span>
+            ${provBadge}
+          </div>
+          <div class="history-stat-col" style="gap:6px;">
+            <div class="history-stat">
+              <span class="history-stat-label">Best Round</span>
+              <span class="history-stat-value under" style="font-size:18px;">${bestRound}</span>
+            </div>
+            <div class="history-stat">
+              <span class="history-stat-label">Worst Round</span>
+              <span class="history-stat-value over" style="font-size:18px;">${worstRound}</span>
+            </div>
+          </div>
+        </div>`;
+    }
+  }
+
   el.innerHTML = `
+    ${ratingRowHtml}
     <div class="history-stat-row">
       <div class="history-stat">
         <span class="history-stat-label">Avg Rank</span>
@@ -1955,7 +1992,6 @@ async function fetchAll(token) {
 async function autoLoadToken() {
   // Reset to today's view whenever refresh is triggered
   viewingYesterday = false;
-  viewingHandicap  = false;
   cheatersHidden = false;
   const cheaterBtn = document.getElementById('cheaterFilterBtn');
   if (cheaterBtn) cheaterBtn.textContent = 'Remove Cheaters';
@@ -1984,149 +2020,151 @@ async function autoLoadToken() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Handicap leaderboard
+//  DGV VR Rating System
+//  Propagator-based, PDGA-inspired. Fixed 4.5 pts/stroke.
+//  Calibrated so top players land ~1054–1057 (comparable to PDGA elite).
+//  Round Rating = 1000 − (vsPar − dailyDifficulty) × 4.5
+//  Player Rating = weighted rolling avg of round ratings (recent 25% 2×)
 // ═══════════════════════════════════════════════════════════════════
-const HANDICAP_MIN_DAYS  = 30;
-const HANDICAP_FACTOR    = 0.80;
-const HANDICAP_RECENT_N  = 15;
-const HANDICAP_RECENT_W  = 0.70;
-const HANDICAP_PRIOR_W   = 0.30;
+const RATING_PTS                 = 4.5;  // fixed pts/stroke — calibrated to real data
+const RATING_PROPAGATOR_MIN_DAYS = 5;    // min days to be a propagator
+const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to trust difficulty offset
+const RATING_MIN_ROUNDS          = 2;    // min rounds to display a player rating
+const RATING_PROVISIONAL_ROUNDS  = 8;    // rounds before "provisional" badge drops
 
-function computeHandicapIndex(playerName) {
-  if (!historyData || historyData.length === 0) return null;
-  const lower = playerName.toLowerCase();
-  const sessions = [];
-  historyData.forEach(day => {
-    const entry = day.players.find(p => {
-      const n = stripDiscTag(p.name);
-      return n === playerName || n.toLowerCase() === lower;
+// Expose daily difficulty so yesterday renderer can apply correct offset
+let dgvDailyDifficulty = {};
+
+// Compute propagator career averages (flagged players excluded)
+function buildPropagators(history) {
+  const totals = {};
+  const counts = {};
+  history.forEach(day => {
+    day.players.forEach(p => {
+      const name = stripDiscTag(p.name);
+      if (isFlagged(name)) return;
+      totals[name] = (totals[name] || 0) + p.vsPar;
+      counts[name] = (counts[name] || 0) + 1;
     });
-    if (entry) sessions.push(entry.vsPar);
   });
-  if (sessions.length < HANDICAP_MIN_DAYS) return null;
-  const recent = sessions.slice(-HANDICAP_RECENT_N);
-  const prior  = sessions.slice(0, sessions.length - HANDICAP_RECENT_N);
-  const avgRecent = recent.reduce((s, v) => s + v, 0) / recent.length;
-  let weightedAvg;
-  if (prior.length === 0) {
-    weightedAvg = avgRecent;
-  } else {
-    const avgPrior = prior.reduce((s, v) => s + v, 0) / prior.length;
-    weightedAvg = avgRecent * HANDICAP_RECENT_W + avgPrior * HANDICAP_PRIOR_W;
-  }
-  return weightedAvg * HANDICAP_FACTOR; // full precision — round at display only
-}
-
-function formatHandicapVsPar(adjustedExact) {
-  const rounded = Math.round(adjustedExact);
-  if (rounded === 0) return { display: 'E',             cls: 'even',  label: 'even par' };
-  if (rounded < 0)   return { display: String(rounded), cls: 'under', label: 'under par' };
-  return               { display: '+' + rounded,        cls: 'over',  label: 'over par' };
-}
-
-function toggleHandicapLeaderboard() {
-  viewingHandicap = !viewingHandicap;
-  const vsParHeader = document.getElementById('vsParHeader');
-  if (viewingHandicap) {
-    if (vsParHeader) vsParHeader.textContent = 'Handicapped VS Par';
-    loadHistoryData().then(() => {
-      renderHandicapLeaderboard();
-      updateYesterdayBtn();
-    });
-  } else {
-    if (vsParHeader) vsParHeader.textContent = 'VS Par';
-    updateYesterdayBtn();
-    renderLeaderboard();
-  }
-}
-
-function renderHandicapLeaderboard() {
-  if (!historyData) return;
-  const container = document.getElementById('lbRows');
-  const ranked   = [];
-  const unranked = [];
-
-  allScoresGlobal.forEach(entry => {
-    const playerName = stripDiscTag(entry.playerName);
-    if (isFlagged(playerName)) return;
-    const rawScore    = entry.score !== undefined ? entry.score : 0;
-    const handicapIdx = computeHandicapIndex(playerName);
-    if (handicapIdx === null) {
-      unranked.push({ playerName, rawScore });
-    } else {
-      const rawVsPar      = rawScore - seededPar;
-      const adjustedExact = rawVsPar - handicapIdx;
-      ranked.push({ playerName, rawScore, adjustedExact });
+  const props = {};
+  Object.keys(counts).forEach(name => {
+    if (counts[name] >= RATING_PROPAGATOR_MIN_DAYS) {
+      props[name] = totals[name] / counts[name];
     }
   });
+  return props;
+}
 
-  ranked.sort((a, b) => a.adjustedExact - b.adjustedExact);
-
-  // Tied ranks based on rounded adjusted score
-  const rankList = [];
-  for (let i = 0; i < ranked.length; i++) {
-    const roundedI = Math.round(ranked[i].adjustedExact);
-    if (i > 0 && roundedI === Math.round(ranked[i - 1].adjustedExact)) {
-      rankList.push(rankList[i - 1]);
-    } else {
-      rankList.push(i + 1);
+// Compute per-day difficulty offset using propagators
+function buildDailyDifficulty(history, propagators) {
+  const difficulty = {};
+  history.forEach(day => {
+    const props = day.players.filter(p => {
+      const name = stripDiscTag(p.name);
+      return !isFlagged(name) && propagators.hasOwnProperty(name);
+    });
+    if (props.length < RATING_MIN_PROPAGATORS) {
+      difficulty[day.date] = 0;
+      return;
     }
+    const offsets = props.map(p => p.vsPar - propagators[stripDiscTag(p.name)]);
+    difficulty[day.date] = offsets.reduce((s, v) => s + v, 0) / offsets.length;
+  });
+  dgvDailyDifficulty = difficulty; // expose globally for yesterday renderer
+  return difficulty;
+}
+
+// Compute a single round rating
+function computeRoundRating(vsPar, difficultyOffset) {
+  return 1000 - (vsPar - difficultyOffset) * RATING_PTS;
+}
+
+// Compute rolling player rating from array of round ratings
+function computeRollingRating(roundRatings) {
+  const n = roundRatings.length;
+  if (n < RATING_MIN_ROUNDS) return null;
+
+  // Recent 25% double-weighted if 9+ rounds
+  const weights = new Array(n).fill(1.0);
+  if (n >= 9) {
+    const cutoff = n - Math.max(1, Math.round(n * 0.25));
+    for (let i = cutoff; i < n; i++) weights[i] = 2.0;
   }
 
-  // Nerd gold: lowest rank among nerds in ranked list
-  const nerdRanks = rankList.filter((_, j) => isNerd(ranked[j].playerName));
-  const bestNerdRank = nerdRanks.length >= 1 ? Math.min(...nerdRanks) : Infinity;
+  // Weighted average
+  let sumW = 0, sumRW = 0;
+  roundRatings.forEach((r, i) => { sumRW += r * weights[i]; sumW += weights[i]; });
+  const wavg = sumRW / sumW;
 
-  const rankedHtml = ranked.map((p, i) => {
-    const rank        = rankList[i];
-    const tied        = ranked.some((r, j) => j !== i && Math.round(r.adjustedExact) === Math.round(p.adjustedExact));
-    const rankDisplay = tied ? `T${rank}` : String(rank);
-    const rankCls     = getRankClass(rank);
-    const rowCls      = getRowClass(rank);
-    const nerd        = isNerd(p.playerName);
-    const topNerd     = nerd && rank === bestNerdRank;
-    const stamp       = topNerd ? `<img class="nerd-badge" src="dgvr_nerd_gold.png" alt="DGV VR Nerd Gold">`
-                      : nerd    ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
-                      : '';
-    const fmt = formatHandicapVsPar(p.adjustedExact);
-    return `
-      <div class="${rowCls}" style="animation-delay:${Math.min(i * 20, 600)}ms">
-        ${stamp}
-        <div class="rank ${rankCls}">${rankDisplay}</div>
-        <div class="player-name-wrap">
-          <div class="player-name" onclick="openHistoryModal('${escapeHtml(p.playerName)}')" style="cursor:pointer">${escapeHtml(p.playerName)}</div>
-        </div>
-        <div class="score-cell">
-          <div class="score-vs-par ${fmt.cls}">${fmt.display}</div>
-          <div class="score-raw">${fmt.label}</div>
-        </div>
-        <div class="score-cell">
-          <div class="score-vs-par even" style="font-size:20px">${p.rawScore}</div>
-          <div class="score-raw">total strokes</div>
-        </div>
-      </div>`;
-  }).join('');
-
-  const unrankedHtml = unranked.map((p, i) => `
-    <div class="lb-row handicap-unranked" style="animation-delay:${Math.min((ranked.length + i) * 20, 600)}ms">
-      <div class="rank">—</div>
-      <div class="player-name-wrap">
-        <div class="player-name" onclick="openHistoryModal('${escapeHtml(p.playerName)}')" style="cursor:pointer">${escapeHtml(p.playerName)}</div>
-      </div>
-      <div class="score-cell">
-        <div class="score-vs-par unknown" style="font-size:14px">not enough data</div>
-        <div class="score-raw">30 days required</div>
-      </div>
-      <div class="score-cell">
-        <div class="score-vs-par even" style="font-size:20px">${p.rawScore}</div>
-        <div class="score-raw">total strokes</div>
-      </div>
-    </div>`).join('');
-
-  container.innerHTML = rankedHtml + unrankedHtml;
-  document.getElementById('resultsCount').innerHTML =
-    `<span>${ranked.length}</span> ranked players on today's handicap leaderboard`;
+  // Outlier exclusion (if 7+ rounds): drop rounds >100pts below avg OR >2.5 std devs
+  if (n >= 7) {
+    const variance = roundRatings.reduce((s, r) => s + (r - wavg) ** 2, 0) / n;
+    const std = Math.sqrt(variance);
+    const threshold = Math.min(100, 2.5 * std);
+    const filtered = roundRatings.map((r, i) => ({ r, w: weights[i] }))
+                                 .filter(({ r }) => r >= wavg - threshold);
+    if (filtered.length >= RATING_MIN_ROUNDS) {
+      const fSumW  = filtered.reduce((s, { w }) => s + w, 0);
+      const fSumRW = filtered.reduce((s, { r, w }) => s + r * w, 0);
+      return fSumRW / fSumW;
+    }
+  }
+  return wavg;
 }
+
+// Build full rating data for all non-flagged players from history
+// Returns: { playerName: { rating, roundRatings, roundDates, provisional, bestRound, worstRound } }
+let dgvRatingCache = null;
+
+function buildAllRatings(history) {
+  if (dgvRatingCache) return dgvRatingCache;
+  if (!history || history.length === 0) return {};
+
+  const propagators  = buildPropagators(history);
+  const difficulty   = buildDailyDifficulty(history, propagators);
+
+  const playerRounds = {}; // name -> [{date, vsPar, par, roundRating}]
+
+  history.forEach(day => {
+    const diff = difficulty[day.date] || 0;
+    const par  = day.par;
+    day.players.forEach(p => {
+      const name = stripDiscTag(p.name);
+      if (isFlagged(name)) return;
+      const rr = computeRoundRating(p.vsPar, diff);
+      if (!playerRounds[name]) playerRounds[name] = [];
+      playerRounds[name].push({ date: day.date, vsPar: p.vsPar, par, roundRating: rr });
+    });
+  });
+
+  const result = {};
+  Object.entries(playerRounds).forEach(([name, rounds]) => {
+    const ratingValues = rounds.map(r => r.roundRating);
+    const playerRating = computeRollingRating(ratingValues);
+    if (playerRating === null) return;
+    result[name] = {
+      rating:       Math.round(playerRating),
+      roundRatings: rounds,
+      provisional:  rounds.length < RATING_PROVISIONAL_ROUNDS,
+      bestRound:    Math.round(Math.max(...ratingValues)),
+      worstRound:   Math.round(Math.min(...ratingValues)),
+    };
+  });
+
+  dgvRatingCache = result;
+  return result;
+}
+
+// Get today's round rating for a player given their today score
+// No difficulty offset applied for live leaderboard (today not yet in history)
+function getTodayRoundRating(playerName, todayVsPar) {
+  if (isFlagged(playerName)) return null;
+  return Math.round(1000 - todayVsPar * RATING_PTS);
+}
+
+// Invalidate cache when history reloads
+function invalidateRatingCache() { dgvRatingCache = null; }
 
 loadFlaggedPlayers();
 loadNerdPlayers();
@@ -2155,7 +2193,7 @@ function applyMarquee() {
 const _origRenderLb = typeof renderLeaderboard === 'function' ? renderLeaderboard : null;
 function scheduleMarquee() { setTimeout(applyMarquee, 300); }
 // Hook into MutationObserver on the leaderboard containers
-['leaderboardBody', 'yesterdayBody', 'handicapBody'].forEach(id => {
+['leaderboardBody', 'yesterdayBody'].forEach(id => {
   const el = document.getElementById(id);
   if (!el) return;
   new MutationObserver(scheduleMarquee).observe(el, { childList: true, subtree: true });
