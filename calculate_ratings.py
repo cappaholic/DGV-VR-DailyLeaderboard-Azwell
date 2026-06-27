@@ -5,12 +5,19 @@ Runs every Monday via GitHub Actions.
 Reads public/history.json and public/flagged.json,
 computes DGV VR Ratings for all non-flagged players,
 writes public/ratings.json.
+
+Rolling window methodology (mirrors PDGA):
+  - Primary window: 90 days back from player's most recent round
+  - Fallback window: 180 days if fewer than 8 rounds in primary window
+  - Propagator averages use ALL history (full career) for accuracy
+  - Daily difficulty offsets use ALL history (full career) for accuracy
+  - Only the per-player rating window is restricted to 90/180 days
 """
 
 import json
 import math
 import statistics
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ── Constants (must match index.html) ────────────────────────────────────────
@@ -19,6 +26,11 @@ PROPAGATOR_MIN_DAYS        = 5     # min appearances to be a propagator
 MIN_PROPAGATORS            = 3     # min propagators needed to trust difficulty offset
 RATING_MIN_ROUNDS          = 2     # min rounds to display a player rating
 RATING_PROVISIONAL_ROUNDS  = 8     # rounds before provisional badge drops
+
+# Rolling window (PDGA equivalent: 12 months → 90 days for daily DGV VR play)
+RATING_WINDOW_DAYS         = 90    # primary window
+RATING_WINDOW_FALLBACK     = 180   # fallback if < 8 rounds in primary window
+RATING_WINDOW_MIN_ROUNDS   = 8     # threshold that triggers fallback
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 PUBLIC_DIR   = Path(__file__).parent / "public"
@@ -41,7 +53,8 @@ def is_flagged(name: str, flagged: set) -> bool:
 
 
 def build_propagators(history: list, flagged: set) -> dict:
-    """Players with PROPAGATOR_MIN_DAYS+ appearances → their career avg vsPar."""
+    """Players with PROPAGATOR_MIN_DAYS+ appearances → their career avg vsPar.
+    Uses full history (not windowed) for maximum accuracy."""
     totals = {}
     counts = {}
     for day in history:
@@ -59,7 +72,8 @@ def build_propagators(history: list, flagged: set) -> dict:
 
 
 def build_daily_difficulty(history: list, propagators: dict, flagged: set) -> dict:
-    """Per-day difficulty offset derived from propagator performance."""
+    """Per-day difficulty offset derived from propagator performance.
+    Uses full history (not windowed) so all daily offsets are available."""
     difficulty = {}
     for day in history:
         props = [
@@ -78,6 +92,36 @@ def compute_round_rating(vs_par: float, difficulty_offset: float) -> float:
     return 1000 - (vs_par - difficulty_offset) * RATING_PTS
 
 
+def apply_window(rounds: list, window_days: int, fallback_days: int) -> tuple[list, bool]:
+    """
+    Filter rounds to the rolling window anchored to the player's most recent round.
+    Returns (windowed_rounds, used_fallback).
+
+    Mirrors PDGA logic:
+      - Start with primary window (90 days back from last round)
+      - If fewer than RATING_WINDOW_MIN_ROUNDS exist, extend to fallback (180 days)
+      - If still fewer than RATING_MIN_ROUNDS, use all available rounds
+    """
+    if not rounds:
+        return rounds, False
+
+    last_date = datetime.strptime(rounds[-1]["date"], "%Y-%m-%d").date()
+    primary_cutoff  = (last_date - timedelta(days=window_days)).isoformat()
+    fallback_cutoff = (last_date - timedelta(days=fallback_days)).isoformat()
+
+    primary = [r for r in rounds if r["date"] >= primary_cutoff]
+
+    if len(primary) >= RATING_WINDOW_MIN_ROUNDS:
+        return primary, False
+
+    fallback = [r for r in rounds if r["date"] >= fallback_cutoff]
+    if len(fallback) >= RATING_MIN_ROUNDS:
+        return fallback, True
+
+    # Not enough data in either window — use everything available
+    return rounds, False
+
+
 def compute_rolling_rating(round_ratings: list) -> float | None:
     """Weighted rolling average with recent 25% double-weighted and outlier exclusion."""
     n = len(round_ratings)
@@ -91,8 +135,8 @@ def compute_rolling_rating(round_ratings: list) -> float | None:
         for i in range(cutoff, n):
             weights[i] = 2.0
 
-    sum_w  = sum(weights)
-    w_avg  = sum(r * w for r, w in zip(round_ratings, weights)) / sum_w
+    sum_w = sum(weights)
+    w_avg = sum(r * w for r, w in zip(round_ratings, weights)) / sum_w
 
     # Outlier exclusion: drop rounds >100pts below avg OR >2.5 std devs below avg
     if n >= 7:
@@ -113,15 +157,15 @@ def main():
     # Load data
     history = json.loads(HISTORY_FILE.read_text())
     flagged = load_flagged(FLAGGED_FILE)
-    print(f"  History days: {len(history)}")
+    print(f"  History days:    {len(history)}")
     print(f"  Flagged players: {len(flagged)}")
 
-    # Build propagators and daily difficulty
+    # Build propagators and daily difficulty using FULL history
     propagators = build_propagators(history, flagged)
     difficulty  = build_daily_difficulty(history, propagators, flagged)
-    print(f"  Propagators: {len(propagators)}")
+    print(f"  Propagators:     {len(propagators)}")
 
-    # Collect per-player round ratings
+    # Collect ALL per-player round ratings (full history, pre-windowing)
     player_rounds: dict[str, list] = {}
     for day in history:
         diff = difficulty.get(day["date"], 0.0)
@@ -140,22 +184,33 @@ def main():
                 "difficulty":  round(diff, 4),
             })
 
-    # Compute player ratings
+    # Compute player ratings using rolling window
     players_out = {}
-    for name, rounds in player_rounds.items():
-        rr_vals = [r["roundRating"] for r in rounds]
+    fallback_count = 0
+
+    for name, all_rounds in player_rounds.items():
+        # Apply rolling window (90 days primary, 180 days fallback)
+        windowed, used_fallback = apply_window(
+            all_rounds, RATING_WINDOW_DAYS, RATING_WINDOW_FALLBACK
+        )
+        if used_fallback:
+            fallback_count += 1
+
+        rr_vals = [r["roundRating"] for r in windowed]
         rating  = compute_rolling_rating(rr_vals)
         if rating is None:
             continue
 
-        included = [r for r in rr_vals if r >= min(rr_vals)]  # all after outlier logic
         players_out[name] = {
-            "rating":           round(rating),
-            "provisional":      len(rounds) < RATING_PROVISIONAL_ROUNDS,
-            "rounds_counted":   len(rounds),
-            "best_round":       max(rr_vals),
-            "worst_round":      min(rr_vals),
-            "last_played":      rounds[-1]["date"],
+            "rating":          round(rating),
+            "provisional":     len(windowed) < RATING_PROVISIONAL_ROUNDS,
+            "rounds_counted":  len(windowed),
+            "rounds_in_window": len(windowed),
+            "total_rounds":    len(all_rounds),
+            "used_fallback":   used_fallback,
+            "best_round":      max(rr_vals),
+            "worst_round":     min(rr_vals),
+            "last_played":     all_rounds[-1]["date"],
         }
 
     # Sort by rating descending for readability
@@ -164,18 +219,21 @@ def main():
     )
 
     output = {
-        "generated":   datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "generated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "generated_ts": datetime.now(timezone.utc).isoformat(),
-        "propagators": len(propagators),
-        "players":     players_sorted,
+        "window_days":  RATING_WINDOW_DAYS,
+        "propagators":  len(propagators),
+        "players":      players_sorted,
     }
 
     RATINGS_FILE.write_text(json.dumps(output, separators=(",", ":")))
     print(f"  Ratings written: {len(players_sorted)} players → {RATINGS_FILE}")
+    print(f"  Using fallback window ({RATING_WINDOW_FALLBACK}d): {fallback_count} players")
     print(f"  Top 5:")
     for i, (name, d) in enumerate(list(players_sorted.items())[:5]):
         prov = " (provisional)" if d["provisional"] else ""
-        print(f"    {i+1}. {name}: {d['rating']}{prov}")
+        fb   = " [fallback window]" if d["used_fallback"] else ""
+        print(f"    {i+1}. {name}: {d['rating']}{prov}{fb}")
     print("Done.")
 
 
