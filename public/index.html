@@ -645,35 +645,19 @@
 
   /* Portrait-only: move cheater stamp above name instead of overlaying the row */
   @media (max-width: 600px) and (orientation: portrait) {
-    .lb-row.cheater {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      padding: 8px 12px;
-      min-height: unset;
-    }
+    /* Keep the grid intact — just reposition stamp above the player name, left-aligned */
     .lb-row.cheater .cheater-stamp {
-      position: static;
+      position: absolute;
+      width: 120px;
+      max-width: none;
+      top: 4px;
+      left: 52px;
       transform: none;
-      top: unset; left: unset;
-      width: 130px;
       opacity: 0.9;
-      margin-bottom: 6px;
-      align-self: center;
     }
-    .lb-row.cheater .rank,
-    .lb-row.cheater .player-name-wrap,
-    .lb-row.cheater .score-cell {
-      display: inline-block;
-    }
-    /* Re-lay the remaining cells in a single row after the stamp */
-    .lb-row.cheater > :not(.cheater-stamp) {
-      display: inline-flex;
-    }
-    .lb-row.cheater .score-cell {
-      flex-direction: column;
-      align-items: flex-end;
-      margin-left: auto;
+    /* Push name down enough to clear the stamp */
+    .lb-row.cheater .player-name-wrap {
+      padding-top: 22px;
     }
   }
   .score-vs-par { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; display: block; }
