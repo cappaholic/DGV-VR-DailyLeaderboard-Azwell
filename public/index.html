@@ -639,10 +639,8 @@
     .lb-header, .lb-row { grid-template-columns: 48px 1fr 90px 65px; padding: 10px 12px; align-items: end; }
     .lb-header.yesterday-cols, .lb-row.yesterday-cols { grid-template-columns: 48px 1fr 62px 52px 68px; }
     .lb-row .score-cell { justify-content: flex-end; }
-    .score-vs-par { font-size: 20px; }
     /* Tighten sub-labels in yesterday mode so columns don't bleed */
     .lb-row.yesterday-cols .score-raw { font-size: 8px; letter-spacing: 0; }
-    .lb-row.yesterday-cols .score-vs-par { font-size: 18px; }
   }
 
   /* Portrait-only: move cheater stamp above name instead of overlaying the row */
@@ -1188,8 +1186,8 @@ function renderSnapshotLeaderboard(snap) {
     const yDiff   = dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
     const yRR     = flagged ? null : Math.round(1000 - (yVsPar - yDiff) * RATING_PTS);
     const yrDisplay = yRR !== null
-      ? `<div class="score-vs-par" style="color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
-      : `<div class="score-vs-par even" style="color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
+      ? `<div class="score-vs-par" style="font-size:20px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
+      : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
     return `
       <div class="${rowCls} yesterday-cols" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
