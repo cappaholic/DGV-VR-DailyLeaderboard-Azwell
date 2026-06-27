@@ -1151,8 +1151,8 @@ function renderSnapshotLeaderboard(snap) {
     const yDiff   = dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
     const yRR     = flagged ? null : Math.round(1000 - (yVsPar - yDiff) * RATING_PTS);
     const yrDisplay = yRR !== null
-      ? `<div class="score-vs-par" style="font-size:18px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
-      : `<div class="score-vs-par even" style="font-size:16px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
+      ? `<div class="score-vs-par" style="font-size:20px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
+      : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
     return `
       <div class="${rowCls} yesterday-cols" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
