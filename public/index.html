@@ -637,9 +637,46 @@
 
   @media (max-width: 600px) {
     .lb-header, .lb-row { grid-template-columns: 48px 1fr 90px 65px; padding: 10px 12px; align-items: end; }
-    .lb-header.yesterday-cols, .lb-row.yesterday-cols { grid-template-columns: 48px 1fr 70px 55px 72px; }
+    .lb-header.yesterday-cols, .lb-row.yesterday-cols { grid-template-columns: 48px 1fr 62px 52px 68px; }
     .lb-row .score-cell { justify-content: flex-end; }
     .score-vs-par { font-size: 20px; }
+    /* Tighten sub-labels in yesterday mode so columns don't bleed */
+    .lb-row.yesterday-cols .score-raw { font-size: 8px; letter-spacing: 0; }
+    .lb-row.yesterday-cols .score-vs-par { font-size: 18px; }
+  }
+
+  /* Portrait-only: move cheater stamp above name instead of overlaying the row */
+  @media (max-width: 600px) and (orientation: portrait) {
+    .lb-row.cheater {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 8px 12px;
+      min-height: unset;
+    }
+    .lb-row.cheater .cheater-stamp {
+      position: static;
+      transform: none;
+      top: unset; left: unset;
+      width: 130px;
+      opacity: 0.9;
+      margin-bottom: 6px;
+      align-self: center;
+    }
+    .lb-row.cheater .rank,
+    .lb-row.cheater .player-name-wrap,
+    .lb-row.cheater .score-cell {
+      display: inline-block;
+    }
+    /* Re-lay the remaining cells in a single row after the stamp */
+    .lb-row.cheater > :not(.cheater-stamp) {
+      display: inline-flex;
+    }
+    .lb-row.cheater .score-cell {
+      flex-direction: column;
+      align-items: flex-end;
+      margin-left: auto;
+    }
   }
   .score-vs-par { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; display: block; }
   .score-vs-par.under   { color: #5aad3c; }
@@ -1151,8 +1188,8 @@ function renderSnapshotLeaderboard(snap) {
     const yDiff   = dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
     const yRR     = flagged ? null : Math.round(1000 - (yVsPar - yDiff) * RATING_PTS);
     const yrDisplay = yRR !== null
-      ? `<div class="score-vs-par" style="font-size:20px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
-      : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
+      ? `<div class="score-vs-par" style="color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
+      : `<div class="score-vs-par even" style="color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
     return `
       <div class="${rowCls} yesterday-cols" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
