@@ -891,7 +891,7 @@
         <span>Player</span>
         <span style="text-align:right; white-space:nowrap; display:block;" id="vsParHeader">VS Par</span>
         <span style="text-align:right">Strokes</span>
-        <span style="text-align:right; white-space:nowrap; display:block; color:var(--accent2);">Round Rating</span>
+        <span style="text-align:right; white-space:nowrap; display:none;" id="roundRatingHeader">Round Rating</span>
       </div>
       <div id="lbRows"></div>
       </div>
@@ -1054,6 +1054,7 @@ function toggleYesterdayLeaderboard() {
     renderSnapshotLeaderboard(yesterdaySnapshot);
     document.getElementById('yesterdayBanner').style.display = '';
     document.getElementById('lbHeader').classList.add('yesterday-cols');
+    document.getElementById('roundRatingHeader').style.display = '';
     // Switch layout labels and border color to yesterday mode
     document.querySelector('#layoutStrip .layout-section-label').textContent = "Yesterday's Courses";
     document.querySelector('#scorecardSection .layout-section-label').textContent = "Yesterday's Layout";
@@ -1072,6 +1073,7 @@ function showTodayLeaderboard() {
   viewingYesterday = false;
   document.getElementById('yesterdayBanner').style.display = 'none';
   document.getElementById('lbHeader').classList.remove('yesterday-cols');
+  document.getElementById('roundRatingHeader').style.display = 'none';
   document.querySelector('#layoutStrip .layout-section-label').textContent = "Today's Courses";
   document.querySelector('#scorecardSection .layout-section-label').textContent = "Today's Layout";
   document.getElementById('layoutStrip').classList.remove('yesterday-mode');
@@ -1834,8 +1836,8 @@ function renderHistoryContent(playerName, days) {
       const provBadge = provisional
         ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;display:block;margin-top:2px;">Provisional</span>`
         : '';
-      // Color tier: 1050+ gold, 1030+ accent2, 1000+ white, under 1000 muted
-      const ratingCls = rating >= 1050 ? 'gold' : rating >= 1030 ? 'accent2' : rating >= 1000 ? 'even' : 'rank-default';
+      // DGV VR Rating displayed in white — informational, not competitive
+      const ratingCls = 'even';
       ratingRowHtml = `
         <div class="history-stat-row dgv-rating-row">
           <div class="history-stat" style="flex:1;">
