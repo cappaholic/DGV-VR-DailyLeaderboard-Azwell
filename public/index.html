@@ -979,7 +979,6 @@
         <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()">Remove Cheaters</button>
       </div>
       <div id="todayViewBtns" class="btn-group">
-        <button class="refresh-btn" id="top50Btn" onclick="openTop50Modal()" style="white-space:nowrap;">DGV VR Ratings</button>
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
         <div id="refreshBtnWrap"><button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button></div>
       </div>
@@ -1835,8 +1834,10 @@ function renderHistoryContent(playerName, days) {
     }
   }
 
+  const ratingLeaderboardBtn = `<div style="text-align:center; margin: 8px 0 12px;"><button class="history-cheater-btn" onclick="closeHistoryModal(); openTop50Modal();" style="width:100%;">DGV VR Rating Leaderboard</button></div>`;
+
   if (!historyData || historyData.length < days) {
-    el.innerHTML = `${ratingRowHtml}<div class="history-unavailable">Data not yet available</div>`;
+    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Data not yet available</div>`;
     return;
   }
   // Use only the most recent `days` entries
@@ -1845,11 +1846,11 @@ function renderHistoryContent(playerName, days) {
     day.players.some(p => stripDiscTag(p.name) === playerName || p.name === playerName)
   );
   if (played.length === 0) {
-    el.innerHTML = `${ratingRowHtml}<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
+    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
     return;
   }
   if (played.length < 2) {
-    el.innerHTML = `${ratingRowHtml}<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">2 day minimum required</span></div>`;
+    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">2 day minimum required</span></div>`;
     return;
   }
 
@@ -1965,6 +1966,7 @@ function renderHistoryContent(playerName, days) {
 
   el.innerHTML = `
     ${ratingRowHtml}
+    ${ratingLeaderboardBtn}
     <div class="history-stat-row">
       <div class="history-stat">
         <span class="history-stat-label">Avg Rank</span>
