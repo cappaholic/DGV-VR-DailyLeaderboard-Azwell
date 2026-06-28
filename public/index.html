@@ -2151,8 +2151,11 @@ function renderTop50List() {
     return;
   }
 
-  // Include all players through rank 50, plus any ties at the cutoff rank
+  // Top 50 eligibility: 8+ rounds required, matching PDGA's propagator threshold
+  // (the same reason PDGA chose 8 — their 1998 World Championships test case)
+  // Provisional players (< 8 rounds) show ratings in their own modal but not here
   const allSorted = Object.entries(allRatings)
+    .filter(([, d]) => !d.provisional)
     .sort((a, b) => b[1].rating - a[1].rating);
 
   let displayRank = 0;
@@ -2194,11 +2197,11 @@ function renderTop50List() {
 //  Round Rating = 1000 − (vsPar − dailyDifficulty) × 4.5
 //  Player Rating = weighted rolling avg of round ratings (recent 25% 2×)
 // ═══════════════════════════════════════════════════════════════════
-const RATING_PTS                 = 4.5;  // fixed pts/stroke — calibrated to real data
-const RATING_PROPAGATOR_MIN_DAYS = 5;    // min days to be a propagator
+const RATING_PTS                 = 4.5;  // fixed pts/stroke
+const RATING_PROPAGATOR_MIN_DAYS = 8;    // min rounds to be a propagator (PDGA standard)
 const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to trust difficulty offset
-const RATING_MIN_ROUNDS          = 2;    // min rounds to display a player rating
-const RATING_PROVISIONAL_ROUNDS  = 8;    // rounds before "provisional" badge drops
+const RATING_MIN_ROUNDS          = 1;    // min rounds to display a rating (PDGA gives rating after 1 round)
+const RATING_PROVISIONAL_ROUNDS  = 8;    // rounds before "provisional" badge drops + Top 50 eligibility
 
 // Expose daily difficulty so yesterday renderer can apply correct offset
 let dgvDailyDifficulty = {};
