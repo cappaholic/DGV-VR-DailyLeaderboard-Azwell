@@ -2151,12 +2151,14 @@ function renderTop50List() {
     return;
   }
 
-  // Top 50 eligibility: 8+ rounds required, matching PDGA's propagator threshold
-  // (the same reason PDGA chose 8 — their 1998 World Championships test case)
-  // Provisional players (< 8 rounds) show ratings in their own modal but not here
+  // TODO: Once enough players have 8+ rounds, add .filter(([, d]) => !d.provisional)
+  // to enforce the PDGA-equivalent 8-round minimum for leaderboard eligibility.
   const allSorted = Object.entries(allRatings)
-    .filter(([, d]) => !d.provisional)
     .sort((a, b) => b[1].rating - a[1].rating);
+
+  // Update subtitle to reflect actual eligible count
+  const listLabel = allSorted.length <= 50 ? `Top ${allSorted.length} Rankings` : 'Top 50 Rankings';
+  document.querySelector('.top50-subtitle').textContent = `${listLabel} · Updated Weekly`;
 
   let displayRank = 0;
   let prevRating  = null;
