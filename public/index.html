@@ -2158,24 +2158,27 @@ function renderTop50List() {
     .filter(([, d]) => !d.provisional)
     .sort((a, b) => b[1].rating - a[1].rating);
 
-  // Update subtitle to reflect actual eligible count
-  document.querySelector('.top50-subtitle').textContent = 'Top 50 Rankings · Updated Weekly';
+  // Dynamic tier: Top 25 (<50 eligible), Top 50 (<100 eligible), Top 100 (100+)
+  const total = allSorted.length;
+  const tier  = total < 50 ? 25 : total < 100 ? 50 : 100;
 
-  let displayRank = 0;
-  let prevRating  = null;
+  document.querySelector('.top50-title').textContent    = 'DGV VR Ratings';
+  document.querySelector('.top50-subtitle').textContent = `Top ${tier} Rankings · Updated Weekly`;
+
+  let displayRank  = 0;
+  let prevRating   = null;
   let cutoffRating = null;
-  const ranked = [];
+  const ranked     = [];
 
   for (let i = 0; i < allSorted.length; i++) {
     const [name, d] = allSorted[i];
     if (d.rating !== prevRating) displayRank = i + 1;
     prevRating = d.rating;
 
-    if (displayRank <= 50) {
+    if (displayRank <= tier) {
       cutoffRating = d.rating;
       ranked.push({ name, d, displayRank });
     } else if (d.rating === cutoffRating) {
-      // Include ties at the last rank
       ranked.push({ name, d, displayRank });
     } else {
       break;
@@ -2193,9 +2196,9 @@ function renderTop50List() {
       </div>`;
   }
 
-  // Pad remaining spots up to 50 with placeholder rows
+  // Pad remaining spots to tier size with placeholder rows
   const lastRank = ranked.length > 0 ? ranked[ranked.length - 1].displayRank : 0;
-  for (let p = lastRank + 1; p <= 50; p++) {
+  for (let p = lastRank + 1; p <= tier; p++) {
     html += `
       <div class="top50-row" style="cursor:default;">
         <div class="top50-rank">${p}</div>
