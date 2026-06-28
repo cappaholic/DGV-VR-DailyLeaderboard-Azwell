@@ -286,7 +286,7 @@
   }
   .top50-row {
     display: grid;
-    grid-template-columns: 36px 1fr 70px 70px;
+    grid-template-columns: 36px 1fr 70px;
     align-items: center;
     padding: 9px 4px;
     border-bottom: 1px solid rgba(30,61,85,0.6);
@@ -307,19 +307,13 @@
     font-size: 14px; color: var(--white);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .top50-name.provisional { color: var(--muted); }
   .top50-rating {
     font-size: 16px; font-weight: 600; color: var(--white);
     text-align: right;
   }
-  .top50-rounds {
-    font-size: 9px; color: var(--muted);
-    text-align: right; letter-spacing: 1px;
-    text-transform: uppercase;
-  }
   .top50-header-row {
     display: grid;
-    grid-template-columns: 36px 1fr 70px 70px;
+    grid-template-columns: 36px 1fr 70px;
     padding: 0 4px 10px 4px;
     border-bottom: 1px solid var(--border);
     margin-bottom: 4px;
@@ -328,8 +322,7 @@
     font-size: 9px; letter-spacing: 2px; color: var(--muted);
     text-transform: uppercase;
   }
-  .top50-header-row span:nth-child(3),
-  .top50-header-row span:nth-child(4) { text-align: right; }
+  .top50-header-row span:nth-child(3) { text-align: right; }
   .top50-close-btn {
     margin-top: 16px; width: 100%;
     background: transparent; border: 1px solid var(--border);
@@ -2175,23 +2168,13 @@ function renderTop50List() {
     }
 
     const rankCls  = displayRank === 1 ? 'top1' : displayRank === 2 ? 'top2' : displayRank === 3 ? 'top3' : '';
-    const nameCls  = d.provisional ? 'provisional' : '';
-    const provMark = d.provisional ? '<span style="font-size:9px;color:var(--muted);margin-left:4px;">*</span>' : '';
-    const roundsLabel = d.rounds_counted || d.roundRatings?.length || '—';
 
     html += `
       <div class="top50-row" onclick="closeTop50Modal(); openHistoryModal('${escapeHtml(name)}')">
         <div class="top50-rank ${rankCls}">${displayRank}</div>
-        <div class="top50-name ${nameCls}">${escapeHtml(name)}${provMark}</div>
+        <div class="top50-name">${escapeHtml(name)}</div>
         <div class="top50-rating">${d.rating}</div>
-        <div class="top50-rounds">${roundsLabel} rounds</div>
       </div>`;
-  }
-
-  // Footnote if any provisional players in top 50
-  const hasProvisional = sorted.some(([, d]) => d.provisional);
-  if (hasProvisional) {
-    html += `<div style="padding:12px 4px 4px;font-size:9px;color:var(--muted);letter-spacing:1px;">* PROVISIONAL — FEWER THAN 8 ROUNDS</div>`;
   }
 
   container.innerHTML = html;
@@ -2384,7 +2367,6 @@ window.addEventListener('resize', applyMarquee);
         <span style="text-align:center;">Rank</span>
         <span>Player</span>
         <span>Rating</span>
-        <span>Rounds</span>
       </div>
       <div class="top50-list" id="top50List"></div>
       <button class="top50-close-btn" onclick="closeTop50Modal()">Close</button>
