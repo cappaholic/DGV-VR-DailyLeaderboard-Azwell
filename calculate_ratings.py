@@ -22,10 +22,10 @@ from pathlib import Path
 
 # ── Constants (must match index.html) ────────────────────────────────────────
 RATING_PTS                 = 4.5   # fixed pts/stroke
-PROPAGATOR_MIN_DAYS        = 5     # min appearances to be a propagator
+PROPAGATOR_MIN_DAYS        = 8     # min rounds to be a propagator (PDGA standard)
 MIN_PROPAGATORS            = 3     # min propagators needed to trust difficulty offset
-RATING_MIN_ROUNDS          = 2     # min rounds to display a player rating
-RATING_PROVISIONAL_ROUNDS  = 8     # rounds before provisional badge drops
+RATING_MIN_ROUNDS          = 1     # min rounds to display a rating (PDGA gives rating after 1 round)
+RATING_PROVISIONAL_ROUNDS  = 8     # rounds before provisional badge drops + Top 50 eligibility
 
 # Rolling window (PDGA equivalent: 12 months → 90 days for daily DGV VR play)
 RATING_WINDOW_DAYS         = 90    # primary window
