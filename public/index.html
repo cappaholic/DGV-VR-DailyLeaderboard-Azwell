@@ -2151,9 +2151,11 @@ function renderTop50List() {
     return;
   }
 
-  // TODO: Once enough players have 8+ rounds, add .filter(([, d]) => !d.provisional)
-  // to enforce the PDGA-equivalent 8-round minimum for leaderboard eligibility.
+  // Top 50 eligibility: 8+ rounds required, matching PDGA's propagator threshold.
+  // Provisional players (< 8 rounds) show ratings in their own modal but not here.
+  // This mirrors PDGA's system where sustained play is required for leaderboard standing.
   const allSorted = Object.entries(allRatings)
+    .filter(([, d]) => !d.provisional)
     .sort((a, b) => b[1].rating - a[1].rating);
 
   // Update subtitle to reflect actual eligible count
