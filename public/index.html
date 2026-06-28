@@ -2157,8 +2157,7 @@ function renderTop50List() {
     .sort((a, b) => b[1].rating - a[1].rating);
 
   // Update subtitle to reflect actual eligible count
-  const listLabel = allSorted.length <= 50 ? `Top ${allSorted.length} Rankings` : 'Top 50 Rankings';
-  document.querySelector('.top50-subtitle').textContent = `${listLabel} · Updated Weekly`;
+  document.querySelector('.top50-subtitle').textContent = 'Top 50 Rankings · Updated Weekly';
 
   let displayRank = 0;
   let prevRating  = null;
@@ -2189,6 +2188,17 @@ function renderTop50List() {
         <div class="top50-rank ${rankCls}">${rank}</div>
         <div class="top50-name">${escapeHtml(name)}</div>
         <div class="top50-rating">${d.rating}</div>
+      </div>`;
+  }
+
+  // Pad remaining spots up to 50 with placeholder rows
+  const lastRank = ranked.length > 0 ? ranked[ranked.length - 1].displayRank : 0;
+  for (let p = lastRank + 1; p <= 50; p++) {
+    html += `
+      <div class="top50-row" style="cursor:default;">
+        <div class="top50-rank">${p}</div>
+        <div class="top50-name" style="color:var(--muted);font-style:italic;font-size:12px;">Not Enough Players</div>
+        <div class="top50-rating" style="color:var(--muted);">N/A</div>
       </div>`;
   }
 
