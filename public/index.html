@@ -1717,8 +1717,40 @@ function switchHistoryTab(days) {
 
 function renderHistoryContent(playerName, days) {
   const el = document.getElementById('historyContent');
+
+  // ── DGV VR Rating — built first, independent of window data ──────
+  let ratingRowHtml = '';
+  if (historyData && historyData.length > 0) {
+    const allRatings = buildAllRatings(historyData);
+    const playerRatingData = allRatings[playerName];
+    if (playerRatingData) {
+      const { rating, provisional, bestRound, worstRound } = playerRatingData;
+      const provBadge = provisional
+        ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;display:block;margin-top:2px;">Provisional</span>`
+        : '';
+      ratingRowHtml = `
+        <div class="history-stat-row dgv-rating-row">
+          <div class="history-stat" style="flex:1;">
+            <span class="history-stat-label">DGV VR Rating</span>
+            <span class="history-stat-value even" style="font-size:32px;">${rating}</span>
+            ${provBadge}
+          </div>
+          <div class="history-stat-col" style="gap:6px;">
+            <div class="history-stat">
+              <span class="history-stat-label">Best Round</span>
+              <span class="history-stat-value under" style="font-size:18px;">${bestRound}</span>
+            </div>
+            <div class="history-stat">
+              <span class="history-stat-label">Worst Round</span>
+              <span class="history-stat-value over" style="font-size:18px;">${worstRound}</span>
+            </div>
+          </div>
+        </div>`;
+    }
+  }
+
   if (!historyData || historyData.length < days) {
-    el.innerHTML = `<div class="history-unavailable">Data not yet available</div>`;
+    el.innerHTML = `${ratingRowHtml}<div class="history-unavailable">Data not yet available</div>`;
     return;
   }
   // Use only the most recent `days` entries
@@ -1727,11 +1759,11 @@ function renderHistoryContent(playerName, days) {
     day.players.some(p => stripDiscTag(p.name) === playerName || p.name === playerName)
   );
   if (played.length === 0) {
-    el.innerHTML = `<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
+    el.innerHTML = `${ratingRowHtml}<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
     return;
   }
   if (played.length < 2) {
-    el.innerHTML = `<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">2 day minimum required</span></div>`;
+    el.innerHTML = `${ratingRowHtml}<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">2 day minimum required</span></div>`;
     return;
   }
 
@@ -1843,39 +1875,6 @@ function renderHistoryContent(playerName, days) {
         </div>
       </div>
     `;
-  }
-
-  // ── DGV VR Rating ─────────────────────────────────────────────────
-  let ratingRowHtml = '';
-  if (historyData && historyData.length > 0) {
-    const allRatings = buildAllRatings(historyData);
-    const playerRatingData = allRatings[playerName];
-    if (playerRatingData) {
-      const { rating, provisional, bestRound, worstRound } = playerRatingData;
-      const provBadge = provisional
-        ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;display:block;margin-top:2px;">Provisional</span>`
-        : '';
-      // DGV VR Rating displayed in white — informational, not competitive
-      const ratingCls = 'even';
-      ratingRowHtml = `
-        <div class="history-stat-row dgv-rating-row">
-          <div class="history-stat" style="flex:1;">
-            <span class="history-stat-label">DGV VR Rating</span>
-            <span class="history-stat-value ${ratingCls}" style="font-size:32px;">${rating}</span>
-            ${provBadge}
-          </div>
-          <div class="history-stat-col" style="gap:6px;">
-            <div class="history-stat">
-              <span class="history-stat-label">Best Round</span>
-              <span class="history-stat-value under" style="font-size:18px;">${bestRound}</span>
-            </div>
-            <div class="history-stat">
-              <span class="history-stat-label">Worst Round</span>
-              <span class="history-stat-value over" style="font-size:18px;">${worstRound}</span>
-            </div>
-          </div>
-        </div>`;
-    }
   }
 
   el.innerHTML = `
