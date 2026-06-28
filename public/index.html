@@ -2151,27 +2151,37 @@ function renderTop50List() {
     return;
   }
 
-  // Sort by rating descending, take top 50
-  const sorted = Object.entries(allRatings)
-    .sort((a, b) => b[1].rating - a[1].rating)
-    .slice(0, 50);
+  // Include all players through rank 50, plus any ties at the cutoff rank
+  const allSorted = Object.entries(allRatings)
+    .sort((a, b) => b[1].rating - a[1].rating);
+
+  let displayRank = 0;
+  let prevRating  = null;
+  let cutoffRating = null;
+  const ranked = [];
+
+  for (let i = 0; i < allSorted.length; i++) {
+    const [name, d] = allSorted[i];
+    if (d.rating !== prevRating) displayRank = i + 1;
+    prevRating = d.rating;
+
+    if (displayRank <= 50) {
+      cutoffRating = d.rating;
+      ranked.push({ name, d, displayRank });
+    } else if (d.rating === cutoffRating) {
+      // Include ties at the last rank
+      ranked.push({ name, d, displayRank });
+    } else {
+      break;
+    }
+  }
 
   let html = '';
-  let displayRank = 1;
-  for (let i = 0; i < sorted.length; i++) {
-    const [name, d] = sorted[i];
-    // Tied rank: same rating as previous = same rank number
-    if (i > 0 && sorted[i][1].rating === sorted[i - 1][1].rating) {
-      displayRank = displayRank; // keep same
-    } else {
-      displayRank = i + 1;
-    }
-
-    const rankCls  = displayRank === 1 ? 'top1' : displayRank === 2 ? 'top2' : displayRank === 3 ? 'top3' : '';
-
+  for (const { name, d, displayRank: rank } of ranked) {
+    const rankCls = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
     html += `
       <div class="top50-row" onclick="closeTop50Modal(); openHistoryModal('${escapeHtml(name)}')">
-        <div class="top50-rank ${rankCls}">${displayRank}</div>
+        <div class="top50-rank ${rankCls}">${rank}</div>
         <div class="top50-name">${escapeHtml(name)}</div>
         <div class="top50-rating">${d.rating}</div>
       </div>`;
@@ -2362,7 +2372,7 @@ window.addEventListener('resize', applyMarquee);
   <div class="top50-overlay" id="top50Overlay" onclick="handleTop50OverlayClick(event)">
     <div class="top50-modal">
       <div class="top50-title">DGV VR Ratings</div>
-      <div class="top50-subtitle">Top 50 Players · Updated Weekly</div>
+      <div class="top50-subtitle">Top 50 Rankings · Updated Weekly</div>
       <div class="top50-header-row">
         <span style="text-align:center;">Rank</span>
         <span>Player</span>
