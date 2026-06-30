@@ -2413,29 +2413,29 @@ function invalidateRatingCache() { dgvRatingCache = null; }
 
 // ═══════════════════════════════════════════════════════════════════
 //  Data Reset announcement popup
-//  Shows once per browser PER RESET EVENT. The stored value must exactly
-//  match RESET_VERSION below — any mismatch (including no value, or a
-//  stale value from a prior reset/test) re-shows the popup. To trigger
-//  the popup again for a future reset, just change RESET_VERSION.
+//  Shows once per browser SESSION — not once ever. Uses sessionStorage,
+//  which persists across normal in-site navigation (clicking around,
+//  opening modals, refreshing the same tab) but clears the moment the
+//  tab or browser is closed. Reopening the site fresh always shows it
+//  again. This guarantees the message reaches every visit while not
+//  being annoying within a single visit.
 // ═══════════════════════════════════════════════════════════════════
 const RESET_POPUP_KEY = 'dgvvr_reset_acknowledged';
-const RESET_VERSION    = '2026-06-30'; // bump this any time a new reset happens
 
 function initResetPopup() {
   try {
-    const seen = localStorage.getItem(RESET_POPUP_KEY);
-    if (seen !== RESET_VERSION) {
+    if (!sessionStorage.getItem(RESET_POPUP_KEY)) {
       document.getElementById('resetOverlay').classList.add('open');
     }
   } catch(e) {
-    // localStorage unavailable (private browsing etc) — just don't show
+    // sessionStorage unavailable (private browsing etc) — just don't show
   }
 }
 
 function dismissResetPopup() {
   document.getElementById('resetOverlay').classList.remove('open');
   try {
-    localStorage.setItem(RESET_POPUP_KEY, RESET_VERSION);
+    sessionStorage.setItem(RESET_POPUP_KEY, '1');
   } catch(e) {
     // ignore
   }
