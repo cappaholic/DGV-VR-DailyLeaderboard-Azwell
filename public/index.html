@@ -2188,9 +2188,17 @@ function handleTop50OverlayClick(e) {
 
 function renderTop50List() {
   const container = document.getElementById('top50List');
-  if (!historyData || historyData.length === 0) {
+
+  // Still loading for the first time — wait for it, do not recurse afterward
+  if (!historyLoaded) {
     container.innerHTML = `<div style="text-align:center;color:var(--muted);padding:24px;font-size:11px;letter-spacing:1px;">LOADING HISTORY DATA...</div>`;
     loadHistoryData().then(() => renderTop50List());
+    return;
+  }
+
+  // History has been loaded (possibly empty, e.g. right after a data reset)
+  if (!historyData || historyData.length === 0) {
+    container.innerHTML = `<div style="text-align:center;color:var(--muted);padding:24px;font-size:11px;letter-spacing:1px;">NO DATA AVAILABLE YET</div>`;
     return;
   }
 
@@ -2405,14 +2413,18 @@ function invalidateRatingCache() { dgvRatingCache = null; }
 
 // ═══════════════════════════════════════════════════════════════════
 //  Data Reset announcement popup
-//  Shows once per browser. Dismissed state stored in localStorage.
-//  Key includes a version so a future reset can show it again.
+//  Shows once per browser PER RESET EVENT. The stored value must exactly
+//  match RESET_VERSION below — any mismatch (including no value, or a
+//  stale value from a prior reset/test) re-shows the popup. To trigger
+//  the popup again for a future reset, just change RESET_VERSION.
 // ═══════════════════════════════════════════════════════════════════
-const RESET_POPUP_KEY = 'dgvvr_reset_acknowledged_v1';
+const RESET_POPUP_KEY = 'dgvvr_reset_acknowledged';
+const RESET_VERSION    = '2026-06-30'; // bump this any time a new reset happens
 
 function initResetPopup() {
   try {
-    if (!localStorage.getItem(RESET_POPUP_KEY)) {
+    const seen = localStorage.getItem(RESET_POPUP_KEY);
+    if (seen !== RESET_VERSION) {
       document.getElementById('resetOverlay').classList.add('open');
     }
   } catch(e) {
@@ -2423,7 +2435,7 @@ function initResetPopup() {
 function dismissResetPopup() {
   document.getElementById('resetOverlay').classList.remove('open');
   try {
-    localStorage.setItem(RESET_POPUP_KEY, '1');
+    localStorage.setItem(RESET_POPUP_KEY, RESET_VERSION);
   } catch(e) {
     // ignore
   }
