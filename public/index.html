@@ -253,7 +253,56 @@
     display: block; line-height: 1; margin-top: 3px;
   }
 
-  /* ── Top 50 DGV VR Ratings modal ── */
+  /* ── Data Reset announcement popup ── */
+  .reset-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.82); z-index: 2000;
+    align-items: center; justify-content: center;
+  }
+  .reset-overlay.open { display: flex; }
+  .reset-modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-top: 2px solid var(--accent2);
+    border-radius: 12px; padding: 28px 28px 24px;
+    width: min(420px, 92vw);
+    display: flex; flex-direction: column;
+    align-items: center; gap: 0;
+    box-sizing: border-box;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .reset-logo {
+    width: 74px; height: auto;
+    margin-bottom: 16px;
+    opacity: 0.92; flex-shrink: 0;
+  }
+  .reset-title-svg { width: 100%; margin-bottom: 14px; overflow: visible; }
+  .reset-body {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 1px;
+    color: var(--muted);
+    text-align: justify; line-height: 1.85;
+    margin-bottom: 14px;
+    width: 100%;
+  }
+  .reset-body.thanks {
+    font-size: 13px;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .reset-ok-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 40px; border-radius: 6px;
+    cursor: pointer; transition: all 0.15s;
+    width: 100%;
+  }
+  .reset-ok-btn:hover {
+    border-color: var(--accent2); color: var(--accent2);
+  }
   .top50-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,0.72); z-index: 1000;
@@ -2354,10 +2403,37 @@ function getTodayRoundRating(playerName, todayVsPar) {
 // Invalidate cache when history reloads
 function invalidateRatingCache() { dgvRatingCache = null; }
 
+// ═══════════════════════════════════════════════════════════════════
+//  Data Reset announcement popup
+//  Shows once per browser. Dismissed state stored in localStorage.
+//  Key includes a version so a future reset can show it again.
+// ═══════════════════════════════════════════════════════════════════
+const RESET_POPUP_KEY = 'dgvvr_reset_acknowledged_v1';
+
+function initResetPopup() {
+  try {
+    if (!localStorage.getItem(RESET_POPUP_KEY)) {
+      document.getElementById('resetOverlay').classList.add('open');
+    }
+  } catch(e) {
+    // localStorage unavailable (private browsing etc) — just don't show
+  }
+}
+
+function dismissResetPopup() {
+  document.getElementById('resetOverlay').classList.remove('open');
+  try {
+    localStorage.setItem(RESET_POPUP_KEY, '1');
+  } catch(e) {
+    // ignore
+  }
+}
+
 loadFlaggedPlayers();
 loadNerdPlayers();
 loadYesterdaySnapshot();
 autoLoadToken();
+initResetPopup();
 
 // ── Mobile marquee: detect overflowing player names and animate them ──
 function applyMarquee() {
@@ -2388,6 +2464,38 @@ function scheduleMarquee() { setTimeout(applyMarquee, 300); }
 });
 window.addEventListener('resize', applyMarquee);
 </script>
+  <!-- ── Data Reset announcement popup ── -->
+  <div class="reset-overlay" id="resetOverlay">
+    <div class="reset-modal">
+      <img src="DGVR_Logo.png" alt="Disc Golf Valley VR" class="reset-logo"/>
+      <svg class="reset-title-svg" viewBox="0 0 380 46" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="resetTitleGlow" x="-10%" y="-20%" width="120%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feFlood flood-color="#4ab8e8" flood-opacity="0.5" result="color"/>
+            <feComposite in="color" in2="blur" operator="in" result="glow"/>
+            <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <text x="190" y="36" text-anchor="middle"
+          font-family="'Bebas Neue', Impact, sans-serif" font-size="32" font-weight="400"
+          fill="#eaeaea" stroke="#0a1520" stroke-width="2.5" stroke-linejoin="round"
+          paint-order="stroke fill" letter-spacing="5" filter="url(#resetTitleGlow)"
+        >LEADERBOARD DATA RESET</text>
+      </svg>
+      <div class="reset-body">
+        An exploit found in Disc Golf Valley VR that allowed players to obtain unreachable scores has now been patched. Due to this, the Daily Challenge Leaderboard data has been reset. This will ensure all data used for calculations on this site are accurate.
+      </div>
+      <div class="reset-body">
+        7-day data will be available by July 7th, and 30-day data by July 30th. DGV VR Ratings and the Ratings Leaderboard will begin appearing once players have logged enough rounds on the new data.
+      </div>
+      <div class="reset-body thanks">
+        Thank you for your understanding.
+      </div>
+      <button class="reset-ok-btn" onclick="dismissResetPopup()">OK</button>
+    </div>
+  </div>
+
   <!-- ── Top 50 DGV VR Ratings modal ── -->
   <div class="top50-overlay" id="top50Overlay" onclick="handleTop50OverlayClick(event)">
     <div class="top50-modal">
