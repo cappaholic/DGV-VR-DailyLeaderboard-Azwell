@@ -1017,9 +1017,6 @@
   <div id="leaderboardSection" style="display:none">
     <div class="controls-row" style="position:relative;">
       <div class="results-count" id="resultsCount"></div>
-      <div id="cheaterFilterCenter" style="position:absolute; left:50%; transform:translateX(-50%);">
-        <button class="refresh-btn" id="cheaterFilterBtn" onclick="toggleCheaterFilter()">Remove Cheaters</button>
-      </div>
       <div id="todayViewBtns" class="btn-group">
         <button class="refresh-btn" id="yesterdayBtn" onclick="toggleYesterdayLeaderboard()" style="display:none">Yesterday's Leaderboard</button>
         <div id="refreshBtnWrap"><button class="refresh-btn" id="refreshBtn" onclick="refreshLeaderboardOnly()">↻ Refresh</button></div>
@@ -2445,7 +2442,14 @@ loadFlaggedPlayers();
 loadNerdPlayers();
 loadYesterdaySnapshot();
 autoLoadToken();
-initResetPopup();
+// resetOverlay element is parsed AFTER this </script> tag closes, so we
+// must wait for the DOM to finish loading before looking it up — calling
+// initResetPopup() synchronously here would find a null element and fail.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initResetPopup);
+} else {
+  initResetPopup();
+}
 
 // ── Mobile marquee: detect overflowing player names and animate them ──
 function applyMarquee() {
