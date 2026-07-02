@@ -1284,23 +1284,21 @@ function renderSnapshotLeaderboard(snap) {
                       : topNerd  ? `<img class="nerd-badge" src="dgvr_nerd_gold.png" alt="DGV VR Nerd Gold">`
                       : nerd     ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
                       : '';
-    // Yesterday round rating: fixed 4.5pts + propagator difficulty offset for that date.
-    // Pre-cutoff dates show N/A — scores from before DATA_CUTOFF_DATE are displayed
-    // for reference but must not contribute to any rating calculation or display.
+    // Yesterday round rating: displayed for all dates including pre-cutoff.
+    // Pre-cutoff data is excluded from all calculations (player rating, avg, best/worst)
+    // by DATA_CUTOFF_DATE filtering in buildAllRatings and renderHistoryContent.
+    // Showing the number here is visual only and does not feed any calculation.
     const yPar    = seededPar || 31;
     const yVsPar  = rawScore - yPar;
     const _yNow   = new Date();
     const _yUTC   = new Date(Date.UTC(_yNow.getUTCFullYear(), _yNow.getUTCMonth(), _yNow.getUTCDate()));
     const _yDate  = new Date(_yUTC.getTime() - 86400000).toISOString().slice(0, 10);
     const yDate   = yesterdaySnapshot && yesterdaySnapshot.date ? yesterdaySnapshot.date : _yDate;
-    const isPreCutoff = yDate < DATA_CUTOFF_DATE;
-    const yDiff   = !isPreCutoff && dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
-    const yRR     = (!flagged && !isPreCutoff) ? Math.round(1000 - (yVsPar - yDiff) * RATING_PTS) : null;
+    const yDiff   = dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
+    const yRR     = flagged ? null : Math.round(1000 - (yVsPar - yDiff) * RATING_PTS);
     const yrDisplay = yRR !== null
       ? `<div class="score-vs-par" style="font-size:20px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
-      : isPreCutoff
-        ? `<div class="score-vs-par even" style="font-size:14px;color:var(--muted);">N/A</div><div class="score-raw">pre-patch</div>`
-        : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
+      : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
     return `
       <div class="${rowCls} yesterday-cols" style="animation-delay:${Math.min(i * 20, 600)}ms">
         ${stamp}
