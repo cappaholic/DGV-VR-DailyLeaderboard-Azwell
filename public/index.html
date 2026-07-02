@@ -1784,7 +1784,7 @@ let historyExcludeCheaters = false;
 // since a single bad day dilutes harmlessly into an average but would sit
 // permanently as someone's "best" or "worst" otherwise. Move this forward only
 // if you're confident a given stretch of history is fully trustworthy.
-const BEST_WORST_START_DATE = '2026-06-16';
+const DATA_CUTOFF_DATE = '2026-07-03'; // Only data on/after this date counts toward ANY calculation
 
 async function loadHistoryData() {
   if (historyLoaded) return;
@@ -1880,13 +1880,18 @@ function renderHistoryContent(playerName, days) {
     el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Data not yet available</div>`;
     return;
   }
-  // Use only the most recent `days` entries
-  const window = historyData.slice(-days);
-  const played = window.filter(day =>
-    day.players.some(p => stripDiscTag(p.name) === playerName || p.name === playerName)
-  );
+  // All calculations use only post-cutoff data — this applies to avg rank,
+  // avg VS par, best/worst, and days-played count equally.
+  // Pre-cutoff days remain visible on the leaderboard display but contribute
+  // nothing to any stat shown in this modal.
+  const historyWindow = historyData.slice(-days);
+  const played = historyWindow
+    .filter(day => day.date >= DATA_CUTOFF_DATE)
+    .filter(day =>
+      day.players.some(p => stripDiscTag(p.name) === playerName || p.name === playerName)
+    );
   if (played.length === 0) {
-    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
+    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">No post-reset data for this player<br>in the last ${days} days</div>`;
     return;
   }
   if (played.length < 2) {
@@ -1934,20 +1939,16 @@ function renderHistoryContent(playerName, days) {
   const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
   const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
-  // ── Best/worst — same window as averages (7 or 30 days) ───────────
-  // Uses the same `played` dataset as the averages above, but filtered
-  // to post-cutoff dates only. Unlocks once the player has at least 2
-  // post-cutoff days in the window — enough for a meaningful best AND worst.
-  // Missing days don't lock out the stat; all data used is still post-cutoff.
-  const postCutoffPlayed  = played.filter(d => d.date >= BEST_WORST_START_DATE);
-  const bestWorstUnlocked = postCutoffPlayed.length >= 2;
+  // ── Best/worst ─────────────────────────────────────────────────────
+  // `played` is already filtered to post-cutoff data, so use it directly.
+  const bestWorstUnlocked = played.length >= 2;
 
   let bestWorstRowHtml = '';
   if (bestWorstUnlocked) {
     let bestRank = Infinity, worstRank = -Infinity;
     let bestVsPar = Infinity, worstVsPar = -Infinity;
 
-    postCutoffPlayed.forEach(day => {
+    played.forEach(day => {
       const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
       if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
       if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
@@ -2364,12 +2365,16 @@ function buildAllRatings(history) {
   if (dgvRatingCache) return dgvRatingCache;
   if (!history || history.length === 0) return {};
 
-  const propagators  = buildPropagators(history);
-  const difficulty   = buildDailyDifficulty(history, propagators);
+  // Only use post-cutoff data for all rating calculations
+  const filteredHistory = history.filter(day => day.date >= DATA_CUTOFF_DATE);
+  if (filteredHistory.length === 0) return {};
+
+  const propagators  = buildPropagators(filteredHistory);
+  const difficulty   = buildDailyDifficulty(filteredHistory, propagators);
 
   const playerRounds = {}; // name -> [{date, vsPar, par, roundRating}]
 
-  history.forEach(day => {
+  filteredHistory.forEach(day => {
     const diff = difficulty[day.date] || 0;
     const par  = day.par;
     day.players.forEach(p => {
@@ -2501,10 +2506,10 @@ window.addEventListener('resize', applyMarquee);
         >LEADERBOARD DATA RESET</text>
       </svg>
       <div class="reset-body">
-        An exploit found in Disc Golf Valley VR that allowed players to obtain unreachable scores has been patched in version 1.466, released on June 30th. Due to this, the Daily Challenge Leaderboard data has been reset. This will ensure all data used for calculations on this site are accurate.
+        An exploit found in Disc Golf Valley VR that allowed players to obtain unreachable scores has been patched in version 1.467, released on July 2nd. Due to this, all data prior to July 3rd, 2026 will not be used in any leaderboard calculations on this site. This will ensure all stats, ratings, and rankings are based solely on accurate, post-patch data.
       </div>
       <div class="reset-body">
-        7-day data will be available by July 7th, and 30-day data by July 30th. DGV VR Ratings and the Ratings Leaderboard will begin appearing once players have logged enough rounds on the new data.
+        7-day stats will be available by July 10th, and 30-day stats by August 2nd. DGV VR Ratings and the Ratings Leaderboard will begin appearing once players have logged enough rounds on the new data.
       </div>
       <div class="reset-body thanks">
         Thank you for your understanding.
