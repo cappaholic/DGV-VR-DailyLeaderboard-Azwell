@@ -2222,17 +2222,20 @@ function renderTop50List() {
   if (allSorted.length < LEADERBOARD_MIN_PLAYERS) {
     document.querySelector('.top50-title').textContent    = 'DGV VR Ratings';
     document.querySelector('.top50-subtitle').textContent = 'Updated Weekly';
+    document.querySelector('.top50-header-row').style.display = 'none';
     container.innerHTML = `
       <div style="text-align:center; padding: 40px 16px; color:var(--muted);
                   font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
                   text-transform:uppercase; line-height:2;">
-        Data not yet available<br>
+        Data not yet available<br><br>
         <span style="font-size:9px; opacity:0.6;">
           Rankings will appear once enough players<br>have logged qualifying rounds
         </span>
       </div>`;
     return;
   }
+
+  document.querySelector('.top50-header-row').style.display = '';
 
   // Dynamic tier thresholds:
   //  10–19 eligible → Top 10
