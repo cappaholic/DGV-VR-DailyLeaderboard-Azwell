@@ -2216,9 +2216,31 @@ function renderTop50List() {
     .filter(([, d]) => !d.provisional)
     .sort((a, b) => b[1].rating - a[1].rating);
 
-  // Dynamic tier: Top 25 (<50 eligible), Top 50 (<100 eligible), Top 100 (100+)
+  // Minimum 10 eligible players before showing the leaderboard at all.
+  // Below this threshold a single message is shown instead of rows of placeholders.
+  const LEADERBOARD_MIN_PLAYERS = 10;
+  if (allSorted.length < LEADERBOARD_MIN_PLAYERS) {
+    document.querySelector('.top50-title').textContent    = 'DGV VR Ratings';
+    document.querySelector('.top50-subtitle').textContent = 'Updated Weekly';
+    container.innerHTML = `
+      <div style="text-align:center; padding: 40px 16px; color:var(--muted);
+                  font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
+                  text-transform:uppercase; line-height:2;">
+        Data not yet available<br>
+        <span style="font-size:9px; opacity:0.6;">
+          Rankings will appear once enough players<br>have logged qualifying rounds
+        </span>
+      </div>`;
+    return;
+  }
+
+  // Dynamic tier thresholds:
+  //  10–19 eligible → Top 10
+  //  20–49 eligible → Top 20
+  //  50–99 eligible → Top 50
+  //  100+  eligible → Top 100
   const total = allSorted.length;
-  const tier  = total < 50 ? 25 : total < 100 ? 50 : 100;
+  const tier  = total < 20 ? 10 : total < 50 ? 20 : total < 100 ? 50 : 100;
 
   document.querySelector('.top50-title').textContent    = 'DGV VR Ratings';
   document.querySelector('.top50-subtitle').textContent = `Top ${tier} Rankings · Updated Weekly`;
