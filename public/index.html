@@ -2222,7 +2222,6 @@ function renderTop50List() {
   if (allSorted.length < LEADERBOARD_MIN_PLAYERS) {
     document.querySelector('.top50-title').textContent    = 'DGV VR Ratings';
     document.querySelector('.top50-subtitle').textContent = 'Updated Weekly';
-    document.querySelector('.top50-header-row').style.display = 'none';
     container.innerHTML = `
       <div style="text-align:center; padding: 40px 16px; color:var(--muted);
                   font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
@@ -2234,8 +2233,6 @@ function renderTop50List() {
       </div>`;
     return;
   }
-
-  document.querySelector('.top50-header-row').style.display = '';
 
   // Dynamic tier thresholds:
   //  10–19 eligible → Top 10
