@@ -607,14 +607,6 @@
       display: flex;
       justify-content: center;
     }
-    #cheaterFilterCenter {
-      position: static !important;
-      transform: none !important;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      order: 2;
-    }
     #yesterdayViewBtns {
       order: 1;
       width: 100%;
@@ -1120,7 +1112,6 @@ function isNerd(playerName) {
 let yesterdaySnapshot = null;
 let distUnit = 'ft'; // 'ft' or 'm'
 let viewingYesterday  = false;
-let cheatersHidden    = false;
 
 async function loadYesterdaySnapshot() {
   try {
@@ -1140,23 +1131,7 @@ function updateYesterdayBtn() {
   const yesterdayBtn      = document.getElementById('yesterdayBtn');
   const todayViewBtns     = document.getElementById('todayViewBtns');
   const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
-  const cheaterBtn        = document.getElementById('cheaterFilterBtn');
-  const cheaterCenter     = document.getElementById('cheaterFilterCenter');
   if (!yesterdayBtn) return;
-
-  // Keep label synced to shared state
-  if (cheaterBtn) {
-    cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
-  }
-
-  // Manage center button group visibility
-  const cheaterFilterBtn = document.getElementById('cheaterFilterBtn');
-  if (cheaterCenter) {
-    cheaterCenter.style.display = '';
-  }
-  if (cheaterFilterBtn) {
-    cheaterFilterBtn.style.display = '';
-  }
 
   if (viewingYesterday) {
     const w = todayViewBtns.offsetWidth;
@@ -1172,20 +1147,6 @@ function updateYesterdayBtn() {
     yesterdayBtn.style.display      = yesterdaySnapshot ? '' : 'none';
     const refreshWrap = document.getElementById('refreshBtnWrap');
     if (refreshWrap) refreshWrap.style.display = '';
-  }
-}
-
-// ── Cheater filter toggle ──────────────────────────────────────────
-function toggleCheaterFilter() {
-  cheatersHidden = !cheatersHidden;
-
-  const cheaterBtn = document.getElementById('cheaterFilterBtn');
-  if (cheaterBtn) cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
-
-  if (viewingYesterday && yesterdaySnapshot) {
-    renderSnapshotLeaderboard(yesterdaySnapshot);
-  } else {
-    renderLeaderboard();
   }
 }
 
@@ -1249,13 +1210,8 @@ function renderSnapshotLeaderboard(snap) {
     seededPar = snap.par;
   }
 
-  // Filter cheaters if hidden
-  const displayScores = cheatersHidden
-    ? snap.scores.filter(e => !isFlagged(stripDiscTag(e.playerName)))
-    : snap.scores;
-  const displayRanks = cheatersHidden
-    ? computeTiedRanks(displayScores)
-    : snap.ranks;
+  const displayScores = snap.scores;
+  const displayRanks  = snap.ranks;
 
   // Map original snap rank indices for nerd detection (on the filtered set)
   const snapNerdIndices = displayScores.reduce((acc, e, j) => {
@@ -1718,13 +1674,8 @@ function escapeHtml(str) {
 function renderLeaderboard() {
   const container = document.getElementById('lbRows');
 
-  // If cheaters are hidden, work with a filtered set and recomputed ranks
-  const displayScores = cheatersHidden
-    ? allScoresGlobal.filter(e => !isFlagged(stripDiscTag(e.playerName)))
-    : allScoresGlobal;
-  const displayRanks = cheatersHidden
-    ? computeTiedRanks(displayScores)
-    : globalRanks;
+  const displayScores = allScoresGlobal;
+  const displayRanks  = globalRanks;
 
   // Gold badge: rank-1 nerd when 2+ nerds present; tied rank-1 nerds both get gold
   const nerdIndices = displayScores.reduce((acc, e, i) => {
@@ -1778,7 +1729,6 @@ function renderLeaderboard() {
 let historyData       = null;   // full parsed history.json array
 let historyLoaded     = false;
 let currentHistoryTab = 7;
-let historyExcludeCheaters = false;
 
 // All-time best/worst records only ever consider days on or after this date —
 // everything before it was captured by the pre-fix snapshot workflow and may
@@ -1806,7 +1756,6 @@ function openHistoryModal(playerName) {
   const el = document.getElementById('historyPlayerName');
   el.textContent = playerName;
   el.dataset.rawName = playerName;
-  historyExcludeCheaters = false;
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
   if (isFlagged(playerName)) {
@@ -1878,8 +1827,19 @@ function renderHistoryContent(playerName, days) {
 
   const ratingLeaderboardBtn = `<div style="text-align:center; margin: 8px 0 12px;"><button class="history-cheater-btn" onclick="closeHistoryModal(); openTop50Modal();" style="width:100%;">DGV VR Rating Leaderboard</button></div>`;
 
-  if (!historyData || historyData.length < days) {
+  if (!historyData || historyData.length === 0) {
     el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Data not yet available</div>`;
+    return;
+  }
+
+  // Gate: don't show 7-day stats until 7 days have elapsed since the cutoff,
+  // and don't show 30-day stats until 30 days have elapsed since the cutoff.
+  // This prevents the panel from showing incomplete windows as if they were full.
+  const cutoffDate   = new Date(DATA_CUTOFF_DATE + 'T00:00:00Z');
+  const today        = new Date();
+  const daysElapsed  = Math.floor((today - cutoffDate) / 86400000);
+  if (daysElapsed < days) {
+    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Data not yet available<br><br><span style="font-size:11px;opacity:0.6;">${days}-day window available in ${days - daysElapsed} day${days - daysElapsed === 1 ? '' : 's'}</span></div>`;
     return;
   }
   // All calculations use only post-cutoff data — this applies to avg rank,
@@ -1901,30 +1861,13 @@ function renderHistoryContent(playerName, days) {
     return;
   }
 
-  // Compute stats, optionally re-ranking without cheaters
+  // Compute avg rank and avg VS par from post-cutoff played days
   let totalRank = 0;
   let totalVsPar = 0;
   played.forEach(day => {
     const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
     totalVsPar += me.vsPar;
-    if (historyExcludeCheaters) {
-      // Re-rank: remove cheaters, sort by score ascending, apply tied ranking
-      const clean = day.players
-        .filter(p => !isFlagged(stripDiscTag(p.name)))
-        .sort((a, b) => a.score - b.score);
-      const reranked = [];
-      for (let i = 0; i < clean.length; i++) {
-        if (i > 0 && clean[i].score === clean[i - 1].score) {
-          reranked.push(reranked[i - 1]);
-        } else {
-          reranked.push(i + 1);
-        }
-      }
-      const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-      totalRank += pos >= 0 ? reranked[pos] : me.rank;
-    } else {
-      totalRank += me.rank;
-    }
+    totalRank  += me.rank;
   });
 
   const avgRank  = totalRank  / played.length;
@@ -1937,9 +1880,6 @@ function renderHistoryContent(playerName, days) {
   // Floor avgRank to nearest lower whole number for color matching
   const flooredRank = Math.floor(avgRank);
   const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : 'rank-default';
-
-  const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
-  const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
   // ── Best/worst ─────────────────────────────────────────────────────
   // `played` is already filtered to post-cutoff data, so use it directly.
@@ -1954,27 +1894,8 @@ function renderHistoryContent(playerName, days) {
       const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
       if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
       if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
-
-      let dayRank;
-      if (historyExcludeCheaters) {
-        const clean = day.players
-          .filter(p => !isFlagged(stripDiscTag(p.name)))
-          .sort((a, b) => a.score - b.score);
-        const reranked = [];
-        for (let i = 0; i < clean.length; i++) {
-          if (i > 0 && clean[i].score === clean[i - 1].score) {
-            reranked.push(reranked[i - 1]);
-          } else {
-            reranked.push(i + 1);
-          }
-        }
-        const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-        dayRank = pos >= 0 ? reranked[pos] : me.rank;
-      } else {
-        dayRank = me.rank;
-      }
-      if (dayRank < bestRank)  bestRank  = dayRank;
-      if (dayRank > worstRank) worstRank = dayRank;
+      if (me.rank  < bestRank)   bestRank   = me.rank;
+      if (me.rank  > worstRank)  worstRank  = me.rank;
     });
 
     // Single-day vs par values are whole numbers; format without decimals
@@ -2022,17 +1943,7 @@ function renderHistoryContent(playerName, days) {
     </div>
     ${bestWorstRowHtml}
     <div class="history-played">${played.length} of ${days} days played</div>
-    <div style="text-align:center; margin-top:10px;">
-      <button class="${btnCls}" onclick="toggleHistoryCheaters()">${btnLabel}</button>
-    </div>
   `;
-}
-
-function toggleHistoryCheaters() {
-  historyExcludeCheaters = !historyExcludeCheaters;
-  const nameEl = document.getElementById('historyPlayerName');
-  const name = nameEl.dataset.rawName || nameEl.textContent;
-  renderHistoryContent(name, currentHistoryTab);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2143,9 +2054,6 @@ async function fetchAll(token) {
 async function autoLoadToken() {
   // Reset to today's view whenever refresh is triggered
   viewingYesterday = false;
-  cheatersHidden = false;
-  const cheaterBtn = document.getElementById('cheaterFilterBtn');
-  if (cheaterBtn) cheaterBtn.textContent = 'Remove Cheaters';
   const vsParHeader = document.getElementById('vsParHeader');
   if (vsParHeader) vsParHeader.textContent = 'VS Par';
   const banner = document.getElementById('yesterdayBanner');
