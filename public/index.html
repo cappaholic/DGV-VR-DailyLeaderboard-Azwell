@@ -257,13 +257,16 @@
   .side-panel { display: none; }
 
   @media (min-width: 1200px) {
-    /* Width fills from page edge to close to the leaderboard card content. */
+    /* Positioned with BOTH left and right edges so width is derived by the
+       browser, not approximated. Container is 980px centered (50vw ± 490px)
+       with 24px internal padding, so content edges sit at 50vw ± 466px.
+       Panel's inner edge is placed exactly 16px from that content edge —
+       this stays mathematically exact at any viewport width, unlike a
+       calc() width approximation which drifts at different sizes. */
     .side-panel {
       position: fixed;
       top: 0; bottom: 0;
       overflow: hidden;
-      width: calc((100vw - 980px) / 2 + 24px);
-      max-width: 380px;
       z-index: 0;
       pointer-events: none;
       opacity: 0.65;
@@ -273,15 +276,23 @@
       mask-image: linear-gradient(to bottom,
         transparent 0%, black 10%, black 90%, transparent 100%);
     }
-    .side-panel-left  { left:  16px; display: block; }
-    .side-panel-right { right: 16px; display: block; }
+    .side-panel-left {
+      left:  16px;
+      right: calc(50vw + 482px);
+      display: block;
+    }
+    .side-panel-right {
+      left:  calc(50vw + 482px);
+      right: 16px;
+      display: block;
+    }
 
     .side-scroll-track {
       display: flex;
       flex-direction: column;
       gap: 16px;
       /* 9 photos × (auto height + 16px gap) × 2 copies = one full cycle */
-      animation: sideScrollUp 48s linear infinite;
+      animation: sideScrollUp 75s linear infinite;
     }
     @keyframes sideScrollUp {
       from { transform: translateY(0); }
