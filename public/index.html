@@ -254,33 +254,36 @@
   }
 
   /* ── Side hole panels (desktop only) ── */
-  .side-panel {
-    display: none; /* hidden on mobile, shown via desktop media query below */
-  }
+  .side-panel { display: none; }
 
   @media (min-width: 1200px) {
+    /* Each panel is a fixed full-height strip beside the center column */
     .side-panel {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
       position: fixed;
       top: 0; bottom: 0;
-      width: calc((100vw - 980px) / 2 - 24px);
-      max-width: 220px;
+      width: calc((100vw - 980px) / 2 - 20px);
+      max-width: 380px;
       z-index: 0;
       pointer-events: none;
     }
-    .side-panel-left  { left:  12px; }
-    .side-panel-right { right: 12px; }
+    .side-panel-left  { left:  10px; display: block; }
+    .side-panel-right { right: 10px; display: block; }
 
-    .side-panel-card {
-      width: 100%;
+    /* Three named slot positions — only one visible at a time */
+    .side-slot {
+      position: absolute;
+      left: 0; right: 0;
       opacity: 0;
       transition: opacity 0.6s ease;
-      pointer-events: none;
     }
-    .side-panel-card.visible { opacity: 1; }
+    .side-slot.visible { opacity: 1; }
+
+    /* Slot 1: upper third — bottom edge at 38% of viewport */
+    .side-slot-0 { bottom: calc(62% + 10px); }
+    /* Slot 2: centered vertically */
+    .side-slot-1 { top: 50%; transform: translateY(-50%); }
+    /* Slot 3: lower third — top edge at 62% of viewport */
+    .side-slot-2 { top: calc(62% + 10px); }
 
     .side-hole-img {
       width: 100%;
@@ -298,9 +301,7 @@
       margin-top: 8px;
       display: block;
     }
-    .side-hole-label span {
-      color: var(--white);
-    }
+    .side-hole-label span { color: var(--white); }
   }
   .reset-overlay {
     display: none; position: fixed; inset: 0;
@@ -2539,12 +2540,12 @@ const COURSE_PHOTO_PREFIX = {
   'Grizzly Gulch':     'GG'
 };
 
-let sidePanelTimer  = null;
-let sidePanelIndex  = 0;
-let sidePanelHoles  = [];
+let sidePanelTimer = null;
+let sidePanelStep  = 0;   // 0–8, drives both position (step%3) and hole (step%9)
+let sidePanelHoles = [];
 
-const SIDE_HOLD_MS  = 3000;
-const SIDE_FADE_MS  = 600;
+const SIDE_HOLD_MS = 3000;
+const SIDE_FADE_MS = 600;
 
 function buildSidePanelHoles(layout) {
   if (!layout || !layout.courses) return [];
@@ -2553,72 +2554,102 @@ function buildSidePanelHoles(layout) {
     const prefix = COURSE_PHOTO_PREFIX[entry.course.name] || '';
     entry.holes.forEach((h, hi) => {
       holes.push({
-        layoutHole:  ci * 3 + hi + 1,
-        courseName:  entry.course.name,
-        holeNum:     h.holeNum,
-        par:         h.par,
-        dist:        getHoleDist(entry.course.name, h.holeNum),
-        photo:       `holes/${prefix}${h.holeNum}.png`,
+        layoutHole: ci * 3 + hi + 1,
+        courseName: entry.course.name,
+        holeNum:    h.holeNum,
+        par:        h.par,
+        dist:       getHoleDist(entry.course.name, h.holeNum),
+        photo:      `holes/${prefix}${h.holeNum}.png`,
       });
     });
   });
   return holes;
 }
 
-function renderSidePanelSlide(index, holes) {
-  if (!holes || holes.length === 0) return;
-  const h = holes[index % holes.length];
-  const leftCard  = document.getElementById('sidePanelLeftCard');
-  const rightCard = document.getElementById('sidePanelRightCard');
-  if (!leftCard || !rightCard) return;
-
-  // Left: course hole photo labelled by course + hole number within that course
-  leftCard.innerHTML = `
-    <img class="side-hole-img" src="${h.photo}" alt="${h.courseName} Hole ${h.holeNum}"/>
-    <span class="side-hole-label">${h.courseName} &middot; <span>Hole ${h.holeNum}</span></span>`;
-
-  // Right: same photo labelled by sequential layout position with par and distance
-  rightCard.innerHTML = `
-    <img class="side-hole-img" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
-    <span class="side-hole-label">Hole <span>${h.layoutHole}</span> &middot; PAR ${h.par} &middot; ${h.dist}</span>`;
+function getSidePanelSlots() {
+  return [
+    { l: document.getElementById('spL0'), r: document.getElementById('spR0') },
+    { l: document.getElementById('spL1'), r: document.getElementById('spR1') },
+    { l: document.getElementById('spL2'), r: document.getElementById('spR2') },
+  ];
 }
 
-function sidePanelFadeIn() {
-  document.getElementById('sidePanelLeftCard').classList.add('visible');
-  document.getElementById('sidePanelRightCard').classList.add('visible');
+function renderSidePanelAt(slotIndex, holeIndex, holes) {
+  if (!holes.length) return;
+  const h     = holes[holeIndex % holes.length];
+  const slots = getSidePanelSlots();
+  const s     = slots[slotIndex];
+  if (!s.l || !s.r) return;
+
+  const imgHtml = (alt, label) =>
+    `<img class="side-hole-img" src="${h.photo}" alt="${alt}"/>
+     <span class="side-hole-label">${label}</span>`;
+
+  s.l.innerHTML = imgHtml(
+    `${h.courseName} Hole ${h.holeNum}`,
+    `${h.courseName} &middot; <span>Hole ${h.holeNum}</span>`
+  );
+  s.r.innerHTML = imgHtml(
+    `Hole ${h.layoutHole}`,
+    `Hole <span>${h.layoutHole}</span> &middot; PAR ${h.par} &middot; ${h.dist}`
+  );
 }
 
-function sidePanelFadeOut() {
-  document.getElementById('sidePanelLeftCard').classList.remove('visible');
-  document.getElementById('sidePanelRightCard').classList.remove('visible');
+function sidePanelFadeOutSlot(slotIndex) {
+  const slots = getSidePanelSlots();
+  slots[slotIndex].l.classList.remove('visible');
+  slots[slotIndex].r.classList.remove('visible');
 }
 
-function sidePanelStep(holes) {
-  sidePanelFadeOut();
+function sidePanelFadeInSlot(slotIndex) {
+  const slots = getSidePanelSlots();
+  slots[slotIndex].l.classList.add('visible');
+  slots[slotIndex].r.classList.add('visible');
+}
+
+function sidePanelTick() {
+  const currSlot = sidePanelStep % 3;
+  // Fade out current slot
+  sidePanelFadeOutSlot(currSlot);
   setTimeout(() => {
-    sidePanelIndex = (sidePanelIndex + 1) % holes.length;
-    renderSidePanelSlide(sidePanelIndex, holes);
-    sidePanelFadeIn();
+    // Advance step
+    sidePanelStep = (sidePanelStep + 1) % sidePanelHoles.length;
+    const nextSlot = sidePanelStep % 3;
+    // Render content in next slot then fade it in
+    renderSidePanelAt(nextSlot, sidePanelStep, sidePanelHoles);
+    sidePanelFadeInSlot(nextSlot);
   }, SIDE_FADE_MS);
 }
 
 function startSidePanels(layout) {
   if (window.innerWidth < 1200) return;
   if (sidePanelTimer) clearInterval(sidePanelTimer);
-  sidePanelIndex = 0;
+  // Clear all slots
+  getSidePanelSlots().forEach(s => {
+    s.l.classList.remove('visible');
+    s.r.classList.remove('visible');
+    s.l.innerHTML = '';
+    s.r.innerHTML = '';
+  });
+  sidePanelStep  = 0;
   sidePanelHoles = buildSidePanelHoles(layout);
   if (!sidePanelHoles.length) return;
-  sidePanelFadeOut();
+  // Show first hole in slot 1 (center, position index 0 = slot-0 = top)
+  // Actually start at slot 1 (center) per spec: position 2 is centered
+  sidePanelStep = 0; // hole 0 → slot 0 (top)
   setTimeout(() => {
-    renderSidePanelSlide(0, sidePanelHoles);
-    sidePanelFadeIn();
-    sidePanelTimer = setInterval(() => sidePanelStep(sidePanelHoles), SIDE_HOLD_MS + SIDE_FADE_MS);
+    renderSidePanelAt(0, 0, sidePanelHoles);
+    sidePanelFadeInSlot(0);
+    sidePanelTimer = setInterval(sidePanelTick, SIDE_HOLD_MS + SIDE_FADE_MS);
   }, 50);
 }
 
 function stopSidePanels() {
   if (sidePanelTimer) { clearInterval(sidePanelTimer); sidePanelTimer = null; }
-  sidePanelFadeOut();
+  getSidePanelSlots().forEach(s => {
+    s.l.classList.remove('visible');
+    s.r.classList.remove('visible');
+  });
 }
 
 loadFlaggedPlayers();
@@ -2864,11 +2895,15 @@ window.addEventListener('resize', applyMarquee);
   }
   </script>
   <!-- ── Side hole panels (desktop only) ── -->
-  <div class="side-panel side-panel-left"  id="sidePanelLeft">
-    <div class="side-panel-card" id="sidePanelLeftCard"></div>
+  <div class="side-panel side-panel-left" id="sidePanelLeft">
+    <div class="side-slot side-slot-0" id="spL0"></div>
+    <div class="side-slot side-slot-1" id="spL1"></div>
+    <div class="side-slot side-slot-2" id="spL2"></div>
   </div>
   <div class="side-panel side-panel-right" id="sidePanelRight">
-    <div class="side-panel-card" id="sidePanelRightCard"></div>
+    <div class="side-slot side-slot-0" id="spR0"></div>
+    <div class="side-slot side-slot-1" id="spR1"></div>
+    <div class="side-slot side-slot-2" id="spR2"></div>
   </div>
 
 </body>
