@@ -269,8 +269,7 @@
       overflow: hidden;
       z-index: 0;
       pointer-events: none;
-      opacity: 0.65;
-      /* Fade edges so photos dissolve at top and bottom */
+      opacity: 0.55;
       -webkit-mask-image: linear-gradient(to bottom,
         transparent 0%, black 10%, black 90%, transparent 100%);
       mask-image: linear-gradient(to bottom,
@@ -292,7 +291,7 @@
       flex-direction: column;
       gap: 16px;
       /* 9 photos × (auto height + 16px gap) × 2 copies = one full cycle */
-      animation: sideScrollUp 75s linear infinite;
+      animation: sideScrollUp 100s linear infinite;
     }
     @keyframes sideScrollUp {
       from { transform: translateY(0); }
