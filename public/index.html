@@ -1846,7 +1846,6 @@ function renderLeaderboard() {
 let historyData       = null;   // full parsed history.json array
 let historyLoaded     = false;
 let currentHistoryTab = 7;
-let historyExcludeCheaters = false;
 
 // All-time best/worst records only ever consider days on or after this date —
 // everything before it was captured by the pre-fix snapshot workflow and may
@@ -1877,7 +1876,6 @@ function openHistoryModal(playerName) {
   const el = document.getElementById('historyPlayerName');
   el.textContent = playerName;
   el.dataset.rawName = playerName;
-  historyExcludeCheaters = false;
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
   if (isFlagged(playerName)) {
@@ -1972,30 +1970,13 @@ function renderHistoryContent(playerName, days) {
     return;
   }
 
-  // Compute stats, optionally re-ranking without cheaters
+  // Compute avg rank and avg VS par from post-cutoff played days
   let totalRank = 0;
   let totalVsPar = 0;
   played.forEach(day => {
     const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
     totalVsPar += me.vsPar;
-    if (historyExcludeCheaters) {
-      // Re-rank: remove cheaters, sort by score ascending, apply tied ranking
-      const clean = day.players
-        .filter(p => !isFlagged(stripDiscTag(p.name)))
-        .sort((a, b) => a.score - b.score);
-      const reranked = [];
-      for (let i = 0; i < clean.length; i++) {
-        if (i > 0 && clean[i].score === clean[i - 1].score) {
-          reranked.push(reranked[i - 1]);
-        } else {
-          reranked.push(i + 1);
-        }
-      }
-      const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-      totalRank += pos >= 0 ? reranked[pos] : me.rank;
-    } else {
-      totalRank += me.rank;
-    }
+    totalRank  += me.rank;
   });
 
   const avgRank  = totalRank  / played.length;
@@ -2008,9 +1989,6 @@ function renderHistoryContent(playerName, days) {
   // Floor avgRank to nearest lower whole number for color matching
   const flooredRank = Math.floor(avgRank);
   const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : 'rank-default';
-
-  const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
-  const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
   // ── Best/worst ─────────────────────────────────────────────────────
   // `played` is already filtered to post-cutoff data, so use it directly.
@@ -2025,27 +2003,8 @@ function renderHistoryContent(playerName, days) {
       const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
       if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
       if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
-
-      let dayRank;
-      if (historyExcludeCheaters) {
-        const clean = day.players
-          .filter(p => !isFlagged(stripDiscTag(p.name)))
-          .sort((a, b) => a.score - b.score);
-        const reranked = [];
-        for (let i = 0; i < clean.length; i++) {
-          if (i > 0 && clean[i].score === clean[i - 1].score) {
-            reranked.push(reranked[i - 1]);
-          } else {
-            reranked.push(i + 1);
-          }
-        }
-        const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-        dayRank = pos >= 0 ? reranked[pos] : me.rank;
-      } else {
-        dayRank = me.rank;
-      }
-      if (dayRank < bestRank)  bestRank  = dayRank;
-      if (dayRank > worstRank) worstRank = dayRank;
+      if (me.rank  < bestRank)   bestRank   = me.rank;
+      if (me.rank  > worstRank)  worstRank  = me.rank;
     });
 
     // Single-day vs par values are whole numbers; format without decimals
@@ -2093,17 +2052,7 @@ function renderHistoryContent(playerName, days) {
     </div>
     ${bestWorstRowHtml}
     <div class="history-played">${played.length} of ${days} days played</div>
-    <div style="text-align:center; margin-top:10px;">
-      <button class="${btnCls}" onclick="toggleHistoryCheaters()">${btnLabel}</button>
-    </div>
   `;
-}
-
-function toggleHistoryCheaters() {
-  historyExcludeCheaters = !historyExcludeCheaters;
-  const nameEl = document.getElementById('historyPlayerName');
-  const name = nameEl.dataset.rawName || nameEl.textContent;
-  renderHistoryContent(name, currentHistoryTab);
 }
 
 // ═══════════════════════════════════════════════════════════════════
