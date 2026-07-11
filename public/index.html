@@ -258,66 +258,71 @@
 
   @media (min-width: 1200px) {
     /* Positioned with BOTH left and right edges so width is derived by the
-       browser, not approximated. Container is 980px centered (50vw ± 490px)
-       with 24px internal padding, so content edges sit at 50vw ± 466px.
-       Panel's inner edge is placed exactly 16px from that content edge —
-       this stays mathematically exact at any viewport width, unlike a
-       calc() width approximation which drifts at different sizes. */
+       browser, not approximated. Gap stays exactly 16px from the leaderboard
+       content at any viewport width — see side-panel-left/-right below. */
     .side-panel {
       position: fixed;
       top: 0; bottom: 0;
-      overflow: hidden;
       z-index: 0;
       pointer-events: none;
-      -webkit-mask-image: linear-gradient(to bottom,
-        transparent 0%, black 10%, black 90%, transparent 100%);
-      mask-image: linear-gradient(to bottom,
-        transparent 0%, black 10%, black 90%, transparent 100%);
+      display: flex;
+      flex-direction: column;
     }
     .side-panel-left {
       left:  16px;
       right: calc(50vw + 482px);
-      display: block;
     }
     .side-panel-right {
       left:  calc(50vw + 482px);
       right: 16px;
-      display: block;
     }
 
-    .side-scroll-track {
+    /* Each panel is split into 5 equal vertical sections */
+    .side-section {
+      flex: 1 1 0;
       display: flex;
-      flex-direction: column;
-      gap: 16px;
-      /* 9 photos × (auto height + 16px gap) × 2 copies = one full cycle */
-      animation: sideScrollUp 100s linear infinite;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 0;
     }
-    @keyframes sideScrollUp {
-      from { transform: translateY(0); }
-      to   { transform: translateY(-50%); }
-    }
-    .side-scroll-item {
-      width: 100%;
-      flex-shrink: 0;
-    }
-    .side-hole-img {
-      width: 100%;
-      height: auto;
-      display: block;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-      opacity: 0.60;
-    }
-    .side-hole-label {
+    .side-section-title {
       font-family: 'DM Mono', monospace;
       font-size: 9px; letter-spacing: 2px;
       color: var(--muted); text-transform: uppercase;
       text-align: center;
-      margin-top: 6px;
-      display: block;
     }
-    .side-hole-label span { color: var(--white); }
+    /* Reuse the existing scorecard-pip look for visual consistency
+       with the main "Today's Layout" strip */
+    .side-hole-pip {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--pip-color, var(--border));
+      border-radius: 6px;
+      padding: 8px 4px;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .side-hole-pip-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 8px; color: var(--muted);
+      display: block; line-height: 1; margin-bottom: 3px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .side-hole-pip-num {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px; color: var(--white);
+      display: block; line-height: 1;
+    }
+    .side-hole-pip-dist {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px; color: var(--muted);
+      display: block; line-height: 1; margin-top: 3px;
+    }
+    .side-hole-pip-par {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px; color: var(--muted);
+      display: block; line-height: 1; margin-top: 3px;
+    }
   }
   .reset-overlay {
     display: none; position: fixed; inset: 0;
@@ -2489,80 +2494,80 @@ function dismissResetPopup() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Side hole panels — desktop only, synchronized fade cycle
-//  Left:  course hole photos (holes/XX#.png)
-//  Right: layout hole photos (same images, labelled sequentially)
-//  Both cycle holes 1→9 in sync, fading in 3s then out, then repeat
+//  Side hole panels — desktop only, static 5-section layout
+//  Left:  "Today's Layout" title + holes 1-4
+//  Right: holes 5-9 (no title)
+//  Both update whenever the layout changes (today/yesterday toggle)
 // ═══════════════════════════════════════════════════════════════════
-const COURSE_PHOTO_PREFIX = {
-  'Sunshine Glade':    'SG',
-  'Blueberry Thicket': 'BT',
-  'Oak Hill':          'OH',
-  'Lakeside':          'LS',
-  'Windswept Fields':  'WF',
-  'Harrowing Woods':   'HW',
-  'The Crows Nest':    'CN',
-  'Grizzly Gulch':     'GG'
+const SIDE_COURSE_COLORS = {
+  'Sunshine Glade':    'var(--course-sunshine)',
+  'Blueberry Thicket': 'var(--course-blueberry)',
+  'Oak Hill':          'var(--course-oakhill)',
+  'Lakeside':          'var(--course-lakeside)',
+  'Windswept Fields':  'var(--course-windswept)',
+  'Harrowing Woods':   'var(--course-harrowing)',
+  'The Crows Nest':    'var(--course-crows)',
+  'Grizzly Gulch':     'var(--course-grizzly)'
 };
 
 function buildSidePanelHoles(layout) {
   if (!layout || !layout.courses) return [];
   const holes = [];
   layout.courses.forEach((entry, ci) => {
-    const prefix = COURSE_PHOTO_PREFIX[entry.course.name] || '';
+    const color = SIDE_COURSE_COLORS[entry.course.name] || 'var(--green-neon)';
     entry.holes.forEach((h, hi) => {
       holes.push({
         layoutHole: ci * 3 + hi + 1,
-        courseName: entry.course.name,
-        holeNum:    h.holeNum,
         par:        h.par,
         dist:       getHoleDist(entry.course.name, h.holeNum),
-        photo:      `holes/${prefix}${h.holeNum}.png`,
+        color:      color,
       });
     });
   });
   return holes;
 }
 
-function buildScrollTrackHtml(holes, isLayout) {
-  // Build 2 copies for seamless infinite loop
-  const items = [...holes, ...holes].map(h => {
-    const label = isLayout
-      ? `Hole <span>${h.layoutHole}</span> &middot; PAR ${h.par} &middot; ${h.dist}`
-      : `${h.courseName} &middot; <span>Hole ${h.holeNum}</span>`;
-    return `<div class="side-scroll-item">
-      <img class="side-hole-img" src="${h.photo}" alt="${isLayout ? 'Layout Hole ' + h.layoutHole : h.courseName + ' Hole ' + h.holeNum}"/>
-      <span class="side-hole-label">${label}</span>
+function sideHolePipHtml(h) {
+  return `
+    <div class="side-hole-pip" style="--pip-color:${h.color}">
+      <span class="side-hole-pip-label">Hole</span>
+      <span class="side-hole-pip-num">${h.layoutHole}</span>
+      <span class="side-hole-pip-dist">${h.dist}</span>
+      <span class="side-hole-pip-par">PAR ${h.par}</span>
     </div>`;
-  }).join('');
-  return items;
 }
 
 function startSidePanels(layout) {
   if (window.innerWidth < 1200) return;
   const holes = buildSidePanelHoles(layout);
-  if (!holes.length) return;
+  if (holes.length < 9) return;
 
-  const leftTrack  = document.getElementById('spLeftTrack');
-  const rightTrack = document.getElementById('spRightTrack');
-  if (!leftTrack || !rightTrack) return;
+  const titleText = document.querySelector('.layout-section-label')
+    ? document.querySelector('#scorecardSection .layout-section-label').textContent
+    : "Today's Layout";
 
-  leftTrack.innerHTML  = buildScrollTrackHtml(holes, false);
-  rightTrack.innerHTML = buildScrollTrackHtml(holes, true);
+  // Left panel: title in section 0, holes 1-4 in sections 1-4
+  const leftIds = ['spL0', 'spL1', 'spL2', 'spL3', 'spL4'];
+  const l0 = document.getElementById(leftIds[0]);
+  if (l0) l0.innerHTML = `<span class="side-section-title">${titleText}</span>`;
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById(leftIds[i + 1]);
+    if (el) el.innerHTML = sideHolePipHtml(holes[i]);
+  }
 
-  // Reset animation
-  leftTrack.style.animation  = 'none';
-  rightTrack.style.animation = 'none';
-  void leftTrack.offsetHeight; // force reflow
-  leftTrack.style.animation  = '';
-  rightTrack.style.animation = '';
+  // Right panel: no title, holes 5-9 in all 5 sections
+  const rightIds = ['spR0', 'spR1', 'spR2', 'spR3', 'spR4'];
+  for (let i = 0; i < 5; i++) {
+    const el = document.getElementById(rightIds[i]);
+    if (el) el.innerHTML = sideHolePipHtml(holes[i + 4]);
+  }
 }
 
 function stopSidePanels() {
-  const leftTrack  = document.getElementById('spLeftTrack');
-  const rightTrack = document.getElementById('spRightTrack');
-  if (leftTrack)  { leftTrack.innerHTML  = ''; leftTrack.style.animation  = 'none'; }
-  if (rightTrack) { rightTrack.innerHTML = ''; rightTrack.style.animation = 'none'; }
+  ['spL0','spL1','spL2','spL3','spL4','spR0','spR1','spR2','spR3','spR4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
 }
 
 loadFlaggedPlayers();
@@ -2807,12 +2812,20 @@ window.addEventListener('resize', applyMarquee);
     document.getElementById('holeNextBtn').disabled = slideshowCursor === slideshowHoles.length - 1;
   }
   </script>
-  <!-- ── Side hole panels (desktop only) ── -->
-  <div class="side-panel side-panel-left"  id="sidePanelLeft">
-    <div class="side-scroll-track" id="spLeftTrack"></div>
+  <!-- ── Side hole panels (desktop only) — 5 static sections each ── -->
+  <div class="side-panel side-panel-left" id="sidePanelLeft">
+    <div class="side-section" id="spL0"></div>
+    <div class="side-section" id="spL1"></div>
+    <div class="side-section" id="spL2"></div>
+    <div class="side-section" id="spL3"></div>
+    <div class="side-section" id="spL4"></div>
   </div>
   <div class="side-panel side-panel-right" id="sidePanelRight">
-    <div class="side-scroll-track" id="spRightTrack"></div>
+    <div class="side-section" id="spR0"></div>
+    <div class="side-section" id="spR1"></div>
+    <div class="side-section" id="spR2"></div>
+    <div class="side-section" id="spR3"></div>
+    <div class="side-section" id="spR4"></div>
   </div>
 
 </body>
