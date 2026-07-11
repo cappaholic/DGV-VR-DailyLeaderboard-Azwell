@@ -257,19 +257,23 @@
   .side-panel { display: none; }
 
   @media (min-width: 1200px) {
-    /* Each panel is a fixed full-height strip beside the center column */
+    /* Each panel sits in the gap beside the center column.
+       16px gap matches the vertical gap between panels on the page.
+       Gap: 16px from page edge, 16px from center panel edge. */
     .side-panel {
       position: fixed;
       top: 0; bottom: 0;
-      width: calc((100vw - 980px) / 2 - 20px);
+      /* Total side width = (100vw - 980px) / 2
+         Subtract 16px from page edge + 16px from center panel = 32px total */
+      width: calc((100vw - 980px) / 2 - 32px);
       max-width: 380px;
       z-index: 0;
       pointer-events: none;
     }
-    .side-panel-left  { left:  10px; display: block; }
-    .side-panel-right { right: 10px; display: block; }
+    .side-panel-left  { left:  16px; display: block; }
+    .side-panel-right { right: 16px; display: block; }
 
-    /* Three named slot positions — only one visible at a time */
+    /* Three slot positions — only one visible at a time */
     .side-slot {
       position: absolute;
       left: 0; right: 0;
@@ -278,13 +282,21 @@
     }
     .side-slot.visible { opacity: 1; }
 
-    /* Slot 1: upper third — bottom edge at 38% of viewport */
-    .side-slot-0 { bottom: calc(62% + 10px); }
-    /* Slot 2: centered vertically */
+    /* Slot 0: upper third */
+    .side-slot-0 { bottom: calc(62% + 8px); }
+    /* Slot 1: centered vertically */
     .side-slot-1 { top: 50%; transform: translateY(-50%); }
-    /* Slot 3: lower third — top edge at 62% of viewport */
-    .side-slot-2 { top: calc(62% + 10px); }
+    /* Slot 2: lower third */
+    .side-slot-2 { top: calc(62% + 8px); }
 
+    .side-panel-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px; letter-spacing: 3px;
+      color: var(--accent2); text-transform: uppercase;
+      text-align: center;
+      display: block;
+      margin-bottom: 10px;
+    }
     .side-hole-img {
       width: 100%;
       height: auto;
@@ -2585,14 +2597,21 @@ function renderSidePanelAt(slotIndex, holeIndex, holes) {
     `<img class="side-hole-img" src="${h.photo}" alt="${alt}"/>
      <span class="side-hole-label">${label}</span>`;
 
-  s.l.innerHTML = imgHtml(
-    `${h.courseName} Hole ${h.holeNum}`,
-    `${h.courseName} &middot; <span>Hole ${h.holeNum}</span>`
-  );
-  s.r.innerHTML = imgHtml(
-    `Hole ${h.layoutHole}`,
-    `Hole <span>${h.layoutHole}</span> &middot; PAR ${h.par} &middot; ${h.dist}`
-  );
+  // Left: COURSES panel — course name + hole number within that course
+  s.l.innerHTML =
+    `<span class="side-panel-title">Courses</span>` +
+    imgHtml(
+      `${h.courseName} Hole ${h.holeNum}`,
+      `${h.courseName} &middot; <span>Hole ${h.holeNum}</span>`
+    );
+
+  // Right: LAYOUT panel — sequential layout hole with distance and par
+  s.r.innerHTML =
+    `<span class="side-panel-title">Layout</span>` +
+    imgHtml(
+      `Hole ${h.layoutHole}`,
+      `Hole <span>${h.layoutHole}</span> &middot; PAR ${h.par} &middot; ${h.dist}`
+    );
 }
 
 function sidePanelFadeOutSlot(slotIndex) {
