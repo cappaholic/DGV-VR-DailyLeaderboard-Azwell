@@ -291,38 +291,29 @@
       color: var(--muted); text-transform: uppercase;
       text-align: center;
     }
-    /* Reuse the existing scorecard-pip look for visual consistency
-       with the main "Today's Layout" strip */
+    /* Each hole section shows an actual hole photo with a caption below */
     .side-hole-pip {
-      background: rgba(0,0,0,0.35);
-      border: 1px solid var(--pip-color, var(--border));
-      border-radius: 6px;
-      padding: 8px 4px;
-      text-align: center;
       width: 100%;
       box-sizing: border-box;
     }
-    .side-hole-pip-label {
+    .side-hole-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      opacity: 0.85;
+    }
+    .side-hole-label {
       font-family: 'DM Mono', monospace;
-      font-size: 8px; color: var(--muted);
-      display: block; line-height: 1; margin-bottom: 3px;
-      text-transform: uppercase; letter-spacing: 1px;
+      font-size: 8px; letter-spacing: 1px;
+      color: var(--muted); text-transform: uppercase;
+      text-align: center;
+      margin-top: 6px;
+      display: block;
     }
-    .side-hole-pip-num {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 22px; color: var(--white);
-      display: block; line-height: 1;
-    }
-    .side-hole-pip-dist {
-      font-family: 'DM Mono', monospace;
-      font-size: 9px; color: var(--muted);
-      display: block; line-height: 1; margin-top: 3px;
-    }
-    .side-hole-pip-par {
-      font-family: 'DM Mono', monospace;
-      font-size: 9px; color: var(--muted);
-      display: block; line-height: 1; margin-top: 3px;
-    }
+    .side-hole-label span { color: var(--white); }
   }
   .reset-overlay {
     display: none; position: fixed; inset: 0;
@@ -2499,41 +2490,39 @@ function dismissResetPopup() {
 //  Right: holes 5-9 (no title)
 //  Both update whenever the layout changes (today/yesterday toggle)
 // ═══════════════════════════════════════════════════════════════════
-const SIDE_COURSE_COLORS = {
-  'Sunshine Glade':    'var(--course-sunshine)',
-  'Blueberry Thicket': 'var(--course-blueberry)',
-  'Oak Hill':          'var(--course-oakhill)',
-  'Lakeside':          'var(--course-lakeside)',
-  'Windswept Fields':  'var(--course-windswept)',
-  'Harrowing Woods':   'var(--course-harrowing)',
-  'The Crows Nest':    'var(--course-crows)',
-  'Grizzly Gulch':     'var(--course-grizzly)'
+const SIDE_PHOTO_PREFIX = {
+  'Sunshine Glade':    'SG',
+  'Blueberry Thicket': 'BT',
+  'Oak Hill':          'OH',
+  'Lakeside':          'LS',
+  'Windswept Fields':  'WF',
+  'Harrowing Woods':   'HW',
+  'The Crows Nest':    'CN',
+  'Grizzly Gulch':     'GG'
 };
 
 function buildSidePanelHoles(layout) {
   if (!layout || !layout.courses) return [];
   const holes = [];
   layout.courses.forEach((entry, ci) => {
-    const color = SIDE_COURSE_COLORS[entry.course.name] || 'var(--green-neon)';
+    const prefix = SIDE_PHOTO_PREFIX[entry.course.name] || '';
     entry.holes.forEach((h, hi) => {
       holes.push({
         layoutHole: ci * 3 + hi + 1,
         par:        h.par,
         dist:       getHoleDist(entry.course.name, h.holeNum),
-        color:      color,
+        photo:      `holes/${prefix}${h.holeNum}.png`,
       });
     });
   });
   return holes;
 }
 
-function sideHolePipHtml(h) {
+function sideHolePhotoHtml(h) {
   return `
-    <div class="side-hole-pip" style="--pip-color:${h.color}">
-      <span class="side-hole-pip-label">Hole</span>
-      <span class="side-hole-pip-num">${h.layoutHole}</span>
-      <span class="side-hole-pip-dist">${h.dist}</span>
-      <span class="side-hole-pip-par">PAR ${h.par}</span>
+    <div class="side-hole-pip">
+      <img class="side-hole-img" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
+      <span class="side-hole-label">Hole <span>${h.layoutHole}</span> &middot; PAR ${h.par} &middot; ${h.dist}</span>
     </div>`;
 }
 
@@ -2542,24 +2531,24 @@ function startSidePanels(layout) {
   const holes = buildSidePanelHoles(layout);
   if (holes.length < 9) return;
 
-  const titleText = document.querySelector('.layout-section-label')
+  const titleText = document.querySelector('#scorecardSection .layout-section-label')
     ? document.querySelector('#scorecardSection .layout-section-label').textContent
     : "Today's Layout";
 
-  // Left panel: title in section 0, holes 1-4 in sections 1-4
+  // Left panel: title in section 0, hole photos 1-4 in sections 1-4
   const leftIds = ['spL0', 'spL1', 'spL2', 'spL3', 'spL4'];
   const l0 = document.getElementById(leftIds[0]);
   if (l0) l0.innerHTML = `<span class="side-section-title">${titleText}</span>`;
   for (let i = 0; i < 4; i++) {
     const el = document.getElementById(leftIds[i + 1]);
-    if (el) el.innerHTML = sideHolePipHtml(holes[i]);
+    if (el) el.innerHTML = sideHolePhotoHtml(holes[i]);
   }
 
-  // Right panel: no title, holes 5-9 in all 5 sections
+  // Right panel: no title, hole photos 5-9 in all 5 sections
   const rightIds = ['spR0', 'spR1', 'spR2', 'spR3', 'spR4'];
   for (let i = 0; i < 5; i++) {
     const el = document.getElementById(rightIds[i]);
-    if (el) el.innerHTML = sideHolePipHtml(holes[i + 4]);
+    if (el) el.innerHTML = sideHolePhotoHtml(holes[i + 4]);
   }
 }
 
