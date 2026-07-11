@@ -257,18 +257,16 @@
   .side-panel { display: none; }
 
   @media (min-width: 1200px) {
-    /* Width fills from page edge to 16px from the leaderboard card content.
-       Container is 980px wide with 24px padding, so card content starts at
-       (100vw - 980px)/2 + 24px. Photo right edge should be 16px before that.
-       width = (100vw - 980px)/2 + 8px - 16px = (100vw - 980px)/2 - 8px      */
+    /* Width fills from page edge to close to the leaderboard card content. */
     .side-panel {
       position: fixed;
       top: 0; bottom: 0;
       overflow: hidden;
-      width: calc((100vw - 980px) / 2 - 8px);
+      width: calc((100vw - 980px) / 2 + 24px);
       max-width: 380px;
       z-index: 0;
       pointer-events: none;
+      opacity: 0.65;
       /* Fade edges so photos dissolve at top and bottom */
       -webkit-mask-image: linear-gradient(to bottom,
         transparent 0%, black 10%, black 90%, transparent 100%);
@@ -283,7 +281,7 @@
       flex-direction: column;
       gap: 16px;
       /* 9 photos × (auto height + 16px gap) × 2 copies = one full cycle */
-      animation: sideScrollUp 36s linear infinite;
+      animation: sideScrollUp 48s linear infinite;
     }
     @keyframes sideScrollUp {
       from { transform: translateY(0); }
