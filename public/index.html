@@ -607,6 +607,14 @@
       display: flex;
       justify-content: center;
     }
+    #cheaterFilterCenter {
+      position: static !important;
+      transform: none !important;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      order: 2;
+    }
     #yesterdayViewBtns {
       order: 1;
       width: 100%;
@@ -1112,6 +1120,7 @@ function isNerd(playerName) {
 let yesterdaySnapshot = null;
 let distUnit = 'ft'; // 'ft' or 'm'
 let viewingYesterday  = false;
+let cheatersHidden    = false;
 
 async function loadYesterdaySnapshot() {
   try {
@@ -1131,7 +1140,23 @@ function updateYesterdayBtn() {
   const yesterdayBtn      = document.getElementById('yesterdayBtn');
   const todayViewBtns     = document.getElementById('todayViewBtns');
   const yesterdayViewBtns = document.getElementById('yesterdayViewBtns');
+  const cheaterBtn        = document.getElementById('cheaterFilterBtn');
+  const cheaterCenter     = document.getElementById('cheaterFilterCenter');
   if (!yesterdayBtn) return;
+
+  // Keep label synced to shared state
+  if (cheaterBtn) {
+    cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
+  }
+
+  // Manage center button group visibility
+  const cheaterFilterBtn = document.getElementById('cheaterFilterBtn');
+  if (cheaterCenter) {
+    cheaterCenter.style.display = '';
+  }
+  if (cheaterFilterBtn) {
+    cheaterFilterBtn.style.display = '';
+  }
 
   if (viewingYesterday) {
     const w = todayViewBtns.offsetWidth;
@@ -1147,6 +1172,20 @@ function updateYesterdayBtn() {
     yesterdayBtn.style.display      = yesterdaySnapshot ? '' : 'none';
     const refreshWrap = document.getElementById('refreshBtnWrap');
     if (refreshWrap) refreshWrap.style.display = '';
+  }
+}
+
+// ── Cheater filter toggle ──────────────────────────────────────────
+function toggleCheaterFilter() {
+  cheatersHidden = !cheatersHidden;
+
+  const cheaterBtn = document.getElementById('cheaterFilterBtn');
+  if (cheaterBtn) cheaterBtn.textContent = cheatersHidden ? 'Show Cheaters' : 'Remove Cheaters';
+
+  if (viewingYesterday && yesterdaySnapshot) {
+    renderSnapshotLeaderboard(yesterdaySnapshot);
+  } else {
+    renderLeaderboard();
   }
 }
 
@@ -1210,8 +1249,13 @@ function renderSnapshotLeaderboard(snap) {
     seededPar = snap.par;
   }
 
-  const displayScores = snap.scores;
-  const displayRanks  = snap.ranks;
+  // Filter cheaters if hidden
+  const displayScores = cheatersHidden
+    ? snap.scores.filter(e => !isFlagged(stripDiscTag(e.playerName)))
+    : snap.scores;
+  const displayRanks = cheatersHidden
+    ? computeTiedRanks(displayScores)
+    : snap.ranks;
 
   // Map original snap rank indices for nerd detection (on the filtered set)
   const snapNerdIndices = displayScores.reduce((acc, e, j) => {
@@ -1240,18 +1284,15 @@ function renderSnapshotLeaderboard(snap) {
                       : topNerd  ? `<img class="nerd-badge" src="dgvr_nerd_gold.png" alt="DGV VR Nerd Gold">`
                       : nerd     ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
                       : '';
-    // Yesterday round rating: displayed for all dates including pre-cutoff.
-    // Pre-cutoff data is excluded from all calculations (player rating, avg, best/worst)
-    // by DATA_CUTOFF_DATE filtering in buildAllRatings and renderHistoryContent.
-    // Showing the number here is visual only and does not feed any calculation.
-    const yPar    = seededPar || 31;
-    const yVsPar  = rawScore - yPar;
+    // Yesterday round rating: uses SSA (propagator avg score) — same formula as player ratings.
+    // Pre-cutoff data is excluded from all calculations by DATA_CUTOFF_DATE filtering
+    // in buildAllRatings and renderHistoryContent. Showing the number here is visual only.
     const _yNow   = new Date();
     const _yUTC   = new Date(Date.UTC(_yNow.getUTCFullYear(), _yNow.getUTCMonth(), _yNow.getUTCDate()));
     const _yDate  = new Date(_yUTC.getTime() - 86400000).toISOString().slice(0, 10);
     const yDate   = yesterdaySnapshot && yesterdaySnapshot.date ? yesterdaySnapshot.date : _yDate;
-    const yDiff   = dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
-    const yRR     = flagged ? null : Math.round(1000 - (yVsPar - yDiff) * RATING_PTS);
+    const ySSA    = dgvDailySSA[yDate] !== undefined ? dgvDailySSA[yDate] : null;
+    const yRR     = (flagged || ySSA === null) ? null : Math.round(1000 + (ySSA - rawScore) * RATING_PTS);
     const yrDisplay = yRR !== null
       ? `<div class="score-vs-par" style="font-size:20px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
       : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
@@ -1674,8 +1715,13 @@ function escapeHtml(str) {
 function renderLeaderboard() {
   const container = document.getElementById('lbRows');
 
-  const displayScores = allScoresGlobal;
-  const displayRanks  = globalRanks;
+  // If cheaters are hidden, work with a filtered set and recomputed ranks
+  const displayScores = cheatersHidden
+    ? allScoresGlobal.filter(e => !isFlagged(stripDiscTag(e.playerName)))
+    : allScoresGlobal;
+  const displayRanks = cheatersHidden
+    ? computeTiedRanks(displayScores)
+    : globalRanks;
 
   // Gold badge: rank-1 nerd when 2+ nerds present; tied rank-1 nerds both get gold
   const nerdIndices = displayScores.reduce((acc, e, i) => {
@@ -1729,6 +1775,7 @@ function renderLeaderboard() {
 let historyData       = null;   // full parsed history.json array
 let historyLoaded     = false;
 let currentHistoryTab = 7;
+let historyExcludeCheaters = false;
 
 // All-time best/worst records only ever consider days on or after this date —
 // everything before it was captured by the pre-fix snapshot workflow and may
@@ -1756,6 +1803,7 @@ function openHistoryModal(playerName) {
   const el = document.getElementById('historyPlayerName');
   el.textContent = playerName;
   el.dataset.rawName = playerName;
+  historyExcludeCheaters = false;
   document.getElementById('historyOverlay').classList.add('open');
   document.querySelector('.history-modal').classList.toggle('yesterday-mode', !!viewingYesterday);
   if (isFlagged(playerName)) {
@@ -1827,19 +1875,8 @@ function renderHistoryContent(playerName, days) {
 
   const ratingLeaderboardBtn = `<div style="text-align:center; margin: 8px 0 12px;"><button class="history-cheater-btn" onclick="closeHistoryModal(); openTop50Modal();" style="width:100%;">DGV VR Rating Leaderboard</button></div>`;
 
-  if (!historyData || historyData.length === 0) {
+  if (!historyData || historyData.length < days) {
     el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Data not yet available</div>`;
-    return;
-  }
-
-  // Gate: don't show 7-day stats until 7 days have elapsed since the cutoff,
-  // and don't show 30-day stats until 30 days have elapsed since the cutoff.
-  // This prevents the panel from showing incomplete windows as if they were full.
-  const cutoffDate   = new Date(DATA_CUTOFF_DATE + 'T00:00:00Z');
-  const today        = new Date();
-  const daysElapsed  = Math.floor((today - cutoffDate) / 86400000);
-  if (daysElapsed < days) {
-    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Data not yet available<br><br><span style="font-size:11px;opacity:0.6;">${days}-day window available in ${days - daysElapsed} day${days - daysElapsed === 1 ? '' : 's'}</span></div>`;
     return;
   }
   // All calculations use only post-cutoff data — this applies to avg rank,
@@ -1861,13 +1898,30 @@ function renderHistoryContent(playerName, days) {
     return;
   }
 
-  // Compute avg rank and avg VS par from post-cutoff played days
+  // Compute stats, optionally re-ranking without cheaters
   let totalRank = 0;
   let totalVsPar = 0;
   played.forEach(day => {
     const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
     totalVsPar += me.vsPar;
-    totalRank  += me.rank;
+    if (historyExcludeCheaters) {
+      // Re-rank: remove cheaters, sort by score ascending, apply tied ranking
+      const clean = day.players
+        .filter(p => !isFlagged(stripDiscTag(p.name)))
+        .sort((a, b) => a.score - b.score);
+      const reranked = [];
+      for (let i = 0; i < clean.length; i++) {
+        if (i > 0 && clean[i].score === clean[i - 1].score) {
+          reranked.push(reranked[i - 1]);
+        } else {
+          reranked.push(i + 1);
+        }
+      }
+      const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+      totalRank += pos >= 0 ? reranked[pos] : me.rank;
+    } else {
+      totalRank += me.rank;
+    }
   });
 
   const avgRank  = totalRank  / played.length;
@@ -1880,6 +1934,9 @@ function renderHistoryContent(playerName, days) {
   // Floor avgRank to nearest lower whole number for color matching
   const flooredRank = Math.floor(avgRank);
   const rankCls = flooredRank === 1 ? 'gold' : flooredRank === 2 ? 'silver' : flooredRank === 3 ? 'bronze' : 'rank-default';
+
+  const btnLabel = historyExcludeCheaters ? 'Include Cheaters' : 'Exclude Cheaters';
+  const btnCls   = historyExcludeCheaters ? 'history-cheater-btn active' : 'history-cheater-btn';
 
   // ── Best/worst ─────────────────────────────────────────────────────
   // `played` is already filtered to post-cutoff data, so use it directly.
@@ -1894,8 +1951,27 @@ function renderHistoryContent(playerName, days) {
       const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
       if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
       if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
-      if (me.rank  < bestRank)   bestRank   = me.rank;
-      if (me.rank  > worstRank)  worstRank  = me.rank;
+
+      let dayRank;
+      if (historyExcludeCheaters) {
+        const clean = day.players
+          .filter(p => !isFlagged(stripDiscTag(p.name)))
+          .sort((a, b) => a.score - b.score);
+        const reranked = [];
+        for (let i = 0; i < clean.length; i++) {
+          if (i > 0 && clean[i].score === clean[i - 1].score) {
+            reranked.push(reranked[i - 1]);
+          } else {
+            reranked.push(i + 1);
+          }
+        }
+        const pos = clean.findIndex(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+        dayRank = pos >= 0 ? reranked[pos] : me.rank;
+      } else {
+        dayRank = me.rank;
+      }
+      if (dayRank < bestRank)  bestRank  = dayRank;
+      if (dayRank > worstRank) worstRank = dayRank;
     });
 
     // Single-day vs par values are whole numbers; format without decimals
@@ -1943,7 +2019,17 @@ function renderHistoryContent(playerName, days) {
     </div>
     ${bestWorstRowHtml}
     <div class="history-played">${played.length} of ${days} days played</div>
+    <div style="text-align:center; margin-top:10px;">
+      <button class="${btnCls}" onclick="toggleHistoryCheaters()">${btnLabel}</button>
+    </div>
   `;
+}
+
+function toggleHistoryCheaters() {
+  historyExcludeCheaters = !historyExcludeCheaters;
+  const nameEl = document.getElementById('historyPlayerName');
+  const name = nameEl.dataset.rawName || nameEl.textContent;
+  renderHistoryContent(name, currentHistoryTab);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2054,6 +2140,9 @@ async function fetchAll(token) {
 async function autoLoadToken() {
   // Reset to today's view whenever refresh is triggered
   viewingYesterday = false;
+  cheatersHidden = false;
+  const cheaterBtn = document.getElementById('cheaterFilterBtn');
+  if (cheaterBtn) cheaterBtn.textContent = 'Remove Cheaters';
   const vsParHeader = document.getElementById('vsParHeader');
   if (vsParHeader) vsParHeader.textContent = 'VS Par';
   const banner = document.getElementById('yesterdayBanner');
@@ -2197,63 +2286,75 @@ function renderTop50List() {
 
   container.innerHTML = html;
 }
-//  Propagator-based, PDGA-inspired. Fixed 4.5 pts/stroke.
-//  Calibrated so top players land ~1054–1057 (comparable to PDGA elite).
-//  Round Rating = 1000 − (vsPar − dailyDifficulty) × 4.5
+//  True PDGA method: SSA-anchored, no par involved.
+//  SSA = propagator average raw score for the day (what scratch players shoot).
+//  Round Rating = 1000 + (SSA − playerScore) × 9
 //  Player Rating = weighted rolling avg of round ratings (recent 25% 2×)
 // ═══════════════════════════════════════════════════════════════════
-const RATING_PTS                 = 4.5;  // fixed pts/stroke
+const RATING_PTS                 = 9;    // pts/stroke — calibrated to real post-cutoff data
 const RATING_PROPAGATOR_MIN_DAYS = 8;    // min rounds to be a propagator (PDGA standard)
-const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to trust difficulty offset
-const RATING_MIN_ROUNDS          = 1;    // min rounds to display a rating (PDGA gives rating after 1 round)
-const RATING_PROVISIONAL_ROUNDS  = 8;    // rounds before "provisional" badge drops + Top 50 eligibility
+const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to compute SSA
+const RATING_MIN_ROUNDS          = 1;    // min rounds to display a rating
+const RATING_PROVISIONAL_ROUNDS  = 8;    // rounds before provisional badge drops
 
-// Expose daily difficulty so yesterday renderer can apply correct offset
-let dgvDailyDifficulty = {};
+// Expose daily SSA so yesterday renderer can apply correct value
+// SSA = propagator average score for that day (true PDGA method — no par anchor)
+let dgvDailySSA = {};
 
-// Compute propagator career averages (flagged players excluded)
-function buildPropagators(history) {
+// Compute propagator career average RAW SCORE using ALL history (pre+post cutoff).
+// Propagator identity uses full history so we have enough qualified players
+// to produce meaningful SSA values on post-cutoff days. Par is irrelevant.
+function buildPropagators(fullHistory) {
   const totals = {};
   const counts = {};
-  history.forEach(day => {
+  fullHistory.forEach(day => {
     day.players.forEach(p => {
       const name = stripDiscTag(p.name);
       if (isFlagged(name)) return;
-      totals[name] = (totals[name] || 0) + p.vsPar;
+      totals[name] = (totals[name] || 0) + p.score;
       counts[name] = (counts[name] || 0) + 1;
     });
   });
   const props = {};
   Object.keys(counts).forEach(name => {
     if (counts[name] >= RATING_PROPAGATOR_MIN_DAYS) {
-      props[name] = totals[name] / counts[name];
+      props[name] = totals[name] / counts[name]; // career avg raw score
     }
   });
   return props;
 }
 
-// Compute per-day difficulty offset using propagators
-function buildDailyDifficulty(history, propagators) {
-  const difficulty = {};
+// Compute per-day SSA = average raw score of propagators who played that day.
+// True PDGA method: SSA is what scratch players actually shoot — par never used.
+// Propagators identified from full history; SSA computed from actual day scores.
+// Fallback: trimmed mean (best 60% of scores) when propagators are insufficient.
+function buildDailySSA(history, propagators) {
+  const ssa = {};
   history.forEach(day => {
     const props = day.players.filter(p => {
       const name = stripDiscTag(p.name);
       return !isFlagged(name) && propagators.hasOwnProperty(name);
     });
     if (props.length < RATING_MIN_PROPAGATORS) {
-      difficulty[day.date] = 0;
+      // Fallback: trimmed mean of best 60% of scores (robust against casual outliers)
+      const scores = day.players.map(p => p.score).sort((a, b) => a - b);
+      const trimN  = Math.max(1, Math.floor(scores.length * 0.60));
+      const trimmed = scores.slice(0, trimN);
+      ssa[day.date] = trimmed.reduce((s, v) => s + v, 0) / trimmed.length;
       return;
     }
-    const offsets = props.map(p => p.vsPar - propagators[stripDiscTag(p.name)]);
-    difficulty[day.date] = offsets.reduce((s, v) => s + v, 0) / offsets.length;
+    const propScores = props.map(p => p.score);
+    ssa[day.date] = propScores.reduce((s, v) => s + v, 0) / propScores.length;
   });
-  dgvDailyDifficulty = difficulty; // expose globally for yesterday renderer
-  return difficulty;
+  dgvDailySSA = ssa; // expose globally for yesterday renderer
+  return ssa;
 }
 
-// Compute a single round rating
-function computeRoundRating(vsPar, difficultyOffset) {
-  return 1000 - (vsPar - difficultyOffset) * RATING_PTS;
+// Compute a single round rating.
+// Formula: 1000 + (SSA - playerScore) x pts
+// SSA = what propagators shot today. Score below SSA = above 1000. Par unused.
+function computeRoundRating(playerScore, ssa) {
+  return 1000 + (ssa - playerScore) * RATING_PTS;
 }
 
 // Compute rolling player rating from array of round ratings
@@ -2289,32 +2390,33 @@ function computeRollingRating(roundRatings) {
   return wavg;
 }
 
-// Build full rating data for all non-flagged players from history
-// Returns: { playerName: { rating, roundRatings, roundDates, provisional, bestRound, worstRound } }
+// Build full rating data for all non-flagged players from history.
+// Returns: { playerName: { rating, roundRatings, provisional, bestRound, worstRound } }
 let dgvRatingCache = null;
 
 function buildAllRatings(history) {
   if (dgvRatingCache) return dgvRatingCache;
   if (!history || history.length === 0) return {};
 
-  // Only use post-cutoff data for all rating calculations
   const filteredHistory = history.filter(day => day.date >= DATA_CUTOFF_DATE);
   if (filteredHistory.length === 0) return {};
 
-  const propagators  = buildPropagators(filteredHistory);
-  const difficulty   = buildDailyDifficulty(filteredHistory, propagators);
+  // Propagators identified from FULL history (pre+post cutoff) for maximum pool size.
+  // Daily SSA computed from post-cutoff scores only — those are the legitimate ones.
+  const propagators = buildPropagators(history);
+  const dailySSA    = buildDailySSA(filteredHistory, propagators);
 
-  const playerRounds = {}; // name -> [{date, vsPar, par, roundRating}]
+  const playerRounds = {};
 
   filteredHistory.forEach(day => {
-    const diff = difficulty[day.date] || 0;
-    const par  = day.par;
+    const ssa = dailySSA[day.date];
+    if (ssa === undefined) return;
     day.players.forEach(p => {
       const name = stripDiscTag(p.name);
       if (isFlagged(name)) return;
-      const rr = computeRoundRating(p.vsPar, diff);
+      const rr = computeRoundRating(p.score, ssa);
       if (!playerRounds[name]) playerRounds[name] = [];
-      playerRounds[name].push({ date: day.date, vsPar: p.vsPar, par, roundRating: rr });
+      playerRounds[name].push({ date: day.date, score: p.score, vsPar: p.vsPar, roundRating: rr });
     });
   });
 
@@ -2334,13 +2436,6 @@ function buildAllRatings(history) {
 
   dgvRatingCache = result;
   return result;
-}
-
-// Get today's round rating for a player given their today score
-// No difficulty offset applied for live leaderboard (today not yet in history)
-function getTodayRoundRating(playerName, todayVsPar) {
-  if (isFlagged(playerName)) return null;
-  return Math.round(1000 - todayVsPar * RATING_PTS);
 }
 
 // Invalidate cache when history reloads
