@@ -267,6 +267,7 @@
       pointer-events: none;
       display: flex;
       flex-direction: column;
+      overflow: hidden; /* clip any residual overflow rather than push off-screen */
     }
     .side-panel-left {
       left:  16px;
@@ -277,13 +278,19 @@
       right: 16px;
     }
 
-    /* Each panel is split into 5 equal vertical sections */
+    /* Each panel is split into 5 equal vertical sections.
+       min-height:0 is required here — flex items default to min-height:auto,
+       which refuses to shrink below the intrinsic size of their content
+       (the photo), causing later sections to be pushed off-screen. */
     .side-section {
       flex: 1 1 0;
+      min-height: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 6px 0;
+      padding: 4px 0;
+      overflow: hidden;
     }
     .side-section-title {
       font-family: 'DM Mono', monospace;
@@ -291,14 +298,26 @@
       color: var(--muted); text-transform: uppercase;
       text-align: center;
     }
-    /* Each hole section shows an actual hole photo with a caption below */
+    /* Each hole section shows an actual hole photo with a caption below,
+       both constrained to fit within the section's allocated height. */
     .side-hole-pip {
       width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       box-sizing: border-box;
     }
     .side-hole-img {
-      width: 100%;
+      width: auto;
+      max-width: 100%;
       height: auto;
+      max-height: 100%;
+      object-fit: contain;
+      flex-shrink: 1;
+      min-height: 0;
       display: block;
       border-radius: 8px;
       border: 1px solid var(--border);
@@ -312,6 +331,7 @@
       text-align: center;
       margin-top: 6px;
       display: block;
+      flex-shrink: 0;
     }
     .side-hole-label span { color: var(--white); }
   }
