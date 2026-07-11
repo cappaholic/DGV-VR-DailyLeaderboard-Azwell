@@ -1284,15 +1284,18 @@ function renderSnapshotLeaderboard(snap) {
                       : topNerd  ? `<img class="nerd-badge" src="dgvr_nerd_gold.png" alt="DGV VR Nerd Gold">`
                       : nerd     ? `<img class="nerd-badge" src="dgvr_nerd.png" alt="DGV VR Nerd">`
                       : '';
-    // Yesterday round rating: uses SSA (propagator avg score) — same formula as player ratings.
-    // Pre-cutoff data is excluded from all calculations by DATA_CUTOFF_DATE filtering
-    // in buildAllRatings and renderHistoryContent. Showing the number here is visual only.
+    // Yesterday round rating: displayed for all dates including pre-cutoff.
+    // Pre-cutoff data is excluded from all calculations (player rating, avg, best/worst)
+    // by DATA_CUTOFF_DATE filtering in buildAllRatings and renderHistoryContent.
+    // Showing the number here is visual only and does not feed any calculation.
+    const yPar    = seededPar || 31;
+    const yVsPar  = rawScore - yPar;
     const _yNow   = new Date();
     const _yUTC   = new Date(Date.UTC(_yNow.getUTCFullYear(), _yNow.getUTCMonth(), _yNow.getUTCDate()));
     const _yDate  = new Date(_yUTC.getTime() - 86400000).toISOString().slice(0, 10);
     const yDate   = yesterdaySnapshot && yesterdaySnapshot.date ? yesterdaySnapshot.date : _yDate;
-    const ySSA    = dgvDailySSA[yDate] !== undefined ? dgvDailySSA[yDate] : null;
-    const yRR     = (flagged || ySSA === null) ? null : Math.round(1000 + (ySSA - rawScore) * RATING_PTS);
+    const yDiff   = dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
+    const yRR     = flagged ? null : Math.round(1000 - (yVsPar - yDiff) * RATING_PTS);
     const yrDisplay = yRR !== null
       ? `<div class="score-vs-par" style="font-size:20px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
       : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
@@ -1796,6 +1799,9 @@ async function loadHistoryData() {
   }
   historyLoaded = true;
   invalidateRatingCache();
+  // Eagerly build ratings so dgvDailySSA is populated immediately —
+  // the yesterday leaderboard needs it before any modal is opened.
+  buildAllRatings(historyData);
   updateYesterdayBtn();
 }
 
@@ -2286,75 +2292,63 @@ function renderTop50List() {
 
   container.innerHTML = html;
 }
-//  True PDGA method: SSA-anchored, no par involved.
-//  SSA = propagator average raw score for the day (what scratch players shoot).
-//  Round Rating = 1000 + (SSA − playerScore) × 9
+//  Propagator-based, PDGA-inspired. Fixed 4.5 pts/stroke.
+//  Calibrated so top players land ~1054–1057 (comparable to PDGA elite).
+//  Round Rating = 1000 − (vsPar − dailyDifficulty) × 4.5
 //  Player Rating = weighted rolling avg of round ratings (recent 25% 2×)
 // ═══════════════════════════════════════════════════════════════════
-const RATING_PTS                 = 9;    // pts/stroke — calibrated to real post-cutoff data
+const RATING_PTS                 = 4.5;  // fixed pts/stroke
 const RATING_PROPAGATOR_MIN_DAYS = 8;    // min rounds to be a propagator (PDGA standard)
-const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to compute SSA
-const RATING_MIN_ROUNDS          = 1;    // min rounds to display a rating
-const RATING_PROVISIONAL_ROUNDS  = 8;    // rounds before provisional badge drops
+const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to trust difficulty offset
+const RATING_MIN_ROUNDS          = 1;    // min rounds to display a rating (PDGA gives rating after 1 round)
+const RATING_PROVISIONAL_ROUNDS  = 8;    // rounds before "provisional" badge drops + Top 50 eligibility
 
-// Expose daily SSA so yesterday renderer can apply correct value
-// SSA = propagator average score for that day (true PDGA method — no par anchor)
-let dgvDailySSA = {};
+// Expose daily difficulty so yesterday renderer can apply correct offset
+let dgvDailyDifficulty = {};
 
-// Compute propagator career average RAW SCORE using ALL history (pre+post cutoff).
-// Propagator identity uses full history so we have enough qualified players
-// to produce meaningful SSA values on post-cutoff days. Par is irrelevant.
-function buildPropagators(fullHistory) {
+// Compute propagator career averages (flagged players excluded)
+function buildPropagators(history) {
   const totals = {};
   const counts = {};
-  fullHistory.forEach(day => {
+  history.forEach(day => {
     day.players.forEach(p => {
       const name = stripDiscTag(p.name);
       if (isFlagged(name)) return;
-      totals[name] = (totals[name] || 0) + p.score;
+      totals[name] = (totals[name] || 0) + p.vsPar;
       counts[name] = (counts[name] || 0) + 1;
     });
   });
   const props = {};
   Object.keys(counts).forEach(name => {
     if (counts[name] >= RATING_PROPAGATOR_MIN_DAYS) {
-      props[name] = totals[name] / counts[name]; // career avg raw score
+      props[name] = totals[name] / counts[name];
     }
   });
   return props;
 }
 
-// Compute per-day SSA = average raw score of propagators who played that day.
-// True PDGA method: SSA is what scratch players actually shoot — par never used.
-// Propagators identified from full history; SSA computed from actual day scores.
-// Fallback: trimmed mean (best 60% of scores) when propagators are insufficient.
-function buildDailySSA(history, propagators) {
-  const ssa = {};
+// Compute per-day difficulty offset using propagators
+function buildDailyDifficulty(history, propagators) {
+  const difficulty = {};
   history.forEach(day => {
     const props = day.players.filter(p => {
       const name = stripDiscTag(p.name);
       return !isFlagged(name) && propagators.hasOwnProperty(name);
     });
     if (props.length < RATING_MIN_PROPAGATORS) {
-      // Fallback: trimmed mean of best 60% of scores (robust against casual outliers)
-      const scores = day.players.map(p => p.score).sort((a, b) => a - b);
-      const trimN  = Math.max(1, Math.floor(scores.length * 0.60));
-      const trimmed = scores.slice(0, trimN);
-      ssa[day.date] = trimmed.reduce((s, v) => s + v, 0) / trimmed.length;
+      difficulty[day.date] = 0;
       return;
     }
-    const propScores = props.map(p => p.score);
-    ssa[day.date] = propScores.reduce((s, v) => s + v, 0) / propScores.length;
+    const offsets = props.map(p => p.vsPar - propagators[stripDiscTag(p.name)]);
+    difficulty[day.date] = offsets.reduce((s, v) => s + v, 0) / offsets.length;
   });
-  dgvDailySSA = ssa; // expose globally for yesterday renderer
-  return ssa;
+  dgvDailyDifficulty = difficulty; // expose globally for yesterday renderer
+  return difficulty;
 }
 
-// Compute a single round rating.
-// Formula: 1000 + (SSA - playerScore) x pts
-// SSA = what propagators shot today. Score below SSA = above 1000. Par unused.
-function computeRoundRating(playerScore, ssa) {
-  return 1000 + (ssa - playerScore) * RATING_PTS;
+// Compute a single round rating
+function computeRoundRating(vsPar, difficultyOffset) {
+  return 1000 - (vsPar - difficultyOffset) * RATING_PTS;
 }
 
 // Compute rolling player rating from array of round ratings
@@ -2390,33 +2384,32 @@ function computeRollingRating(roundRatings) {
   return wavg;
 }
 
-// Build full rating data for all non-flagged players from history.
-// Returns: { playerName: { rating, roundRatings, provisional, bestRound, worstRound } }
+// Build full rating data for all non-flagged players from history
+// Returns: { playerName: { rating, roundRatings, roundDates, provisional, bestRound, worstRound } }
 let dgvRatingCache = null;
 
 function buildAllRatings(history) {
   if (dgvRatingCache) return dgvRatingCache;
   if (!history || history.length === 0) return {};
 
+  // Only use post-cutoff data for all rating calculations
   const filteredHistory = history.filter(day => day.date >= DATA_CUTOFF_DATE);
   if (filteredHistory.length === 0) return {};
 
-  // Propagators identified from FULL history (pre+post cutoff) for maximum pool size.
-  // Daily SSA computed from post-cutoff scores only — those are the legitimate ones.
-  const propagators = buildPropagators(history);
-  const dailySSA    = buildDailySSA(filteredHistory, propagators);
+  const propagators  = buildPropagators(filteredHistory);
+  const difficulty   = buildDailyDifficulty(filteredHistory, propagators);
 
-  const playerRounds = {};
+  const playerRounds = {}; // name -> [{date, vsPar, par, roundRating}]
 
   filteredHistory.forEach(day => {
-    const ssa = dailySSA[day.date];
-    if (ssa === undefined) return;
+    const diff = difficulty[day.date] || 0;
+    const par  = day.par;
     day.players.forEach(p => {
       const name = stripDiscTag(p.name);
       if (isFlagged(name)) return;
-      const rr = computeRoundRating(p.score, ssa);
+      const rr = computeRoundRating(p.vsPar, diff);
       if (!playerRounds[name]) playerRounds[name] = [];
-      playerRounds[name].push({ date: day.date, score: p.score, vsPar: p.vsPar, roundRating: rr });
+      playerRounds[name].push({ date: day.date, vsPar: p.vsPar, par, roundRating: rr });
     });
   });
 
@@ -2436,6 +2429,13 @@ function buildAllRatings(history) {
 
   dgvRatingCache = result;
   return result;
+}
+
+// Get today's round rating for a player given their today score
+// No difficulty offset applied for live leaderboard (today not yet in history)
+function getTodayRoundRating(playerName, todayVsPar) {
+  if (isFlagged(playerName)) return null;
+  return Math.round(1000 - todayVsPar * RATING_PTS);
 }
 
 // Invalidate cache when history reloads
