@@ -267,7 +267,7 @@
       position: fixed;
       top: 0; bottom: 0;
       width: calc((100vw - 980px) / 2 - 24px);
-      max-width: 200px;
+      max-width: 220px;
       z-index: 0;
       pointer-events: none;
     }
@@ -282,60 +282,24 @@
     }
     .side-panel-card.visible { opacity: 1; }
 
-    /* Course card style */
-    .side-course-block {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 11px 14px;
+    .side-hole-img {
       width: 100%;
-      box-sizing: border-box;
+      height: auto;
+      display: block;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
-    .side-course-header {
-      display: flex; align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 8px; gap: 4px;
-    }
-    .side-course-num {
+    .side-hole-label {
       font-family: 'DM Mono', monospace;
-      font-size: 8px; letter-spacing: 2px;
+      font-size: 9px; letter-spacing: 2px;
       color: var(--muted); text-transform: uppercase;
-      white-space: nowrap;
-    }
-    .side-course-name {
-      font-size: 10px; font-weight: 600;
-      white-space: nowrap; overflow: hidden;
-      text-overflow: ellipsis; text-align: right;
-    }
-    .side-hole-pip {
-      background: rgba(0,0,0,0.35);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 4px;
       text-align: center;
-      width: 100%;
-      box-sizing: border-box;
+      margin-top: 8px;
+      display: block;
     }
-    .side-hole-pip-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 8px; color: var(--muted);
-      display: block; line-height: 1; margin-bottom: 3px;
-      text-transform: uppercase; letter-spacing: 1px;
-    }
-    .side-hole-pip-num {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 28px; color: var(--white);
-      display: block; line-height: 1;
-    }
-    .side-hole-pip-dist {
-      font-family: 'DM Mono', monospace;
-      font-size: 8px; color: var(--muted);
-      display: block; line-height: 1; margin-top: 3px;
-    }
-    .side-hole-pip-par {
-      font-family: 'DM Mono', monospace;
-      font-size: 8px; display: block;
-      line-height: 1; margin-top: 2px;
+    .side-hole-label span {
+      color: var(--white);
     }
   }
   .reset-overlay {
@@ -2560,43 +2524,41 @@ function dismissResetPopup() {
 
 // ═══════════════════════════════════════════════════════════════════
 //  Side hole panels — desktop only, synchronized fade cycle
-//  Left:  course hole cards (hole-pip style, one at a time)
-//  Right: layout scorecard cards (scorecard-pip style, one at a time)
-//  Both cycle holes 1→9 in sync, fading in for 3s then out, then repeat
+//  Left:  course hole photos (holes/XX#.png)
+//  Right: layout hole photos (same images, labelled sequentially)
+//  Both cycle holes 1→9 in sync, fading in 3s then out, then repeat
 // ═══════════════════════════════════════════════════════════════════
-let sidePanelLayout  = null;  // current layout object
-let sidePanelTimer   = null;  // interval handle
-let sidePanelIndex   = 0;     // current hole index 0–8
-
-const SIDE_HOLD_MS   = 3000;  // hold duration
-const SIDE_FADE_MS   = 600;   // matches CSS transition
-
-const COURSE_COLORS = {
-  'Sunshine Glade':    'var(--course-sunshine)',
-  'Blueberry Thicket': 'var(--course-blueberry)',
-  'Oak Hill':          'var(--course-oakhill)',
-  'Lakeside':          'var(--course-lakeside)',
-  'Windswept Fields':  'var(--course-windswept)',
-  'Harrowing Woods':   'var(--course-harrowing)',
-  'The Crows Nest':    'var(--course-crows)',
-  'Grizzly Gulch':     'var(--course-grizzly)'
+const COURSE_PHOTO_PREFIX = {
+  'Sunshine Glade':    'SG',
+  'Blueberry Thicket': 'BT',
+  'Oak Hill':          'OH',
+  'Lakeside':          'LS',
+  'Windswept Fields':  'WF',
+  'Harrowing Woods':   'HW',
+  'The Crows Nest':    'CN',
+  'Grizzly Gulch':     'GG'
 };
 
+let sidePanelTimer  = null;
+let sidePanelIndex  = 0;
+let sidePanelHoles  = [];
+
+const SIDE_HOLD_MS  = 3000;
+const SIDE_FADE_MS  = 600;
+
 function buildSidePanelHoles(layout) {
-  // Flatten layout into 9 holes with course name, color, hole number, par, dist
   if (!layout || !layout.courses) return [];
   const holes = [];
   layout.courses.forEach((entry, ci) => {
-    const color = COURSE_COLORS[entry.course.name] || 'var(--green-neon)';
+    const prefix = COURSE_PHOTO_PREFIX[entry.course.name] || '';
     entry.holes.forEach((h, hi) => {
       holes.push({
-        layoutHole:  ci * 3 + hi + 1,   // 1–9 sequential position
+        layoutHole:  ci * 3 + hi + 1,
         courseName:  entry.course.name,
-        courseNum:   ci + 1,
-        courseColor: color,
         holeNum:     h.holeNum,
         par:         h.par,
         dist:        getHoleDist(entry.course.name, h.holeNum),
+        photo:       `holes/${prefix}${h.holeNum}.png`,
       });
     });
   });
@@ -2606,33 +2568,19 @@ function buildSidePanelHoles(layout) {
 function renderSidePanelSlide(index, holes) {
   if (!holes || holes.length === 0) return;
   const h = holes[index % holes.length];
-
   const leftCard  = document.getElementById('sidePanelLeftCard');
   const rightCard = document.getElementById('sidePanelRightCard');
   if (!leftCard || !rightCard) return;
 
-  // Left: course hole card (hole-pip style showing hole number within the course)
+  // Left: course hole photo labelled by course + hole number within that course
   leftCard.innerHTML = `
-    <div class="side-course-block" style="border-top: 2px solid ${h.courseColor};">
-      <div class="side-course-header">
-        <span class="side-course-num">Course ${h.courseNum}</span>
-        <span class="side-course-name" style="color:${h.courseColor};">${h.courseName}</span>
-      </div>
-      <div class="side-hole-pip" style="border-color:${h.courseColor};">
-        <span class="side-hole-pip-label">Hole</span>
-        <span class="side-hole-pip-num">${h.holeNum}</span>
-        <span class="side-hole-pip-par" style="color:${h.courseColor};">PAR ${h.par}</span>
-      </div>
-    </div>`;
+    <img class="side-hole-img" src="${h.photo}" alt="${h.courseName} Hole ${h.holeNum}"/>
+    <span class="side-hole-label">${h.courseName} &middot; <span>Hole ${h.holeNum}</span></span>`;
 
-  // Right: layout scorecard card (sequential hole number with dist/par)
+  // Right: same photo labelled by sequential layout position with par and distance
   rightCard.innerHTML = `
-    <div class="side-hole-pip" style="border-color:${h.courseColor};">
-      <span class="side-hole-pip-label">Hole</span>
-      <span class="side-hole-pip-num">${h.layoutHole}</span>
-      <span class="side-hole-pip-dist">${h.dist}</span>
-      <span class="side-hole-pip-par" style="color:${h.courseColor};">PAR ${h.par}</span>
-    </div>`;
+    <img class="side-hole-img" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
+    <span class="side-hole-label">Hole <span>${h.layoutHole}</span> &middot; PAR ${h.par} &middot; ${h.dist}</span>`;
 }
 
 function sidePanelFadeIn() {
@@ -2646,7 +2594,6 @@ function sidePanelFadeOut() {
 }
 
 function sidePanelStep(holes) {
-  // Fade out current, then swap content, then fade in next
   sidePanelFadeOut();
   setTimeout(() => {
     sidePanelIndex = (sidePanelIndex + 1) % holes.length;
@@ -2656,21 +2603,16 @@ function sidePanelStep(holes) {
 }
 
 function startSidePanels(layout) {
-  // Only run on desktop
   if (window.innerWidth < 1200) return;
-
   if (sidePanelTimer) clearInterval(sidePanelTimer);
-  sidePanelLayout = layout;
-  sidePanelIndex  = 0;
-
-  const holes = buildSidePanelHoles(layout);
-  if (!holes.length) return;
-
+  sidePanelIndex = 0;
+  sidePanelHoles = buildSidePanelHoles(layout);
+  if (!sidePanelHoles.length) return;
   sidePanelFadeOut();
   setTimeout(() => {
-    renderSidePanelSlide(0, holes);
+    renderSidePanelSlide(0, sidePanelHoles);
     sidePanelFadeIn();
-    sidePanelTimer = setInterval(() => sidePanelStep(holes), SIDE_HOLD_MS + SIDE_FADE_MS);
+    sidePanelTimer = setInterval(() => sidePanelStep(sidePanelHoles), SIDE_HOLD_MS + SIDE_FADE_MS);
   }, 50);
 }
 
