@@ -253,7 +253,91 @@
     display: block; line-height: 1; margin-top: 3px;
   }
 
-  /* ── Data Reset announcement popup ── */
+  /* ── Side hole panels (desktop only) ── */
+  .side-panel {
+    display: none; /* hidden on mobile, shown via desktop media query below */
+  }
+
+  @media (min-width: 1200px) {
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: fixed;
+      top: 0; bottom: 0;
+      width: calc((100vw - 980px) / 2 - 24px);
+      max-width: 200px;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .side-panel-left  { left:  12px; }
+    .side-panel-right { right: 12px; }
+
+    .side-panel-card {
+      width: 100%;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+    }
+    .side-panel-card.visible { opacity: 1; }
+
+    /* Course card style */
+    .side-course-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .side-course-header {
+      display: flex; align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 8px; gap: 4px;
+    }
+    .side-course-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 8px; letter-spacing: 2px;
+      color: var(--muted); text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .side-course-name {
+      font-size: 10px; font-weight: 600;
+      white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; text-align: right;
+    }
+    .side-hole-pip {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 4px;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .side-hole-pip-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 8px; color: var(--muted);
+      display: block; line-height: 1; margin-bottom: 3px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .side-hole-pip-num {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px; color: var(--white);
+      display: block; line-height: 1;
+    }
+    .side-hole-pip-dist {
+      font-family: 'DM Mono', monospace;
+      font-size: 8px; color: var(--muted);
+      display: block; line-height: 1; margin-top: 3px;
+    }
+    .side-hole-pip-par {
+      font-family: 'DM Mono', monospace;
+      font-size: 8px; display: block;
+      line-height: 1; margin-top: 2px;
+    }
+  }
   .reset-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,0.82); z-index: 2000;
@@ -1565,6 +1649,9 @@ function renderLayout(seed, layout) {
   document.getElementById('scorecardSection').style.display = 'block';
 
   document.getElementById('layoutStrip').classList.add('show');
+
+  // Start side panel cycle with the new layout
+  startSidePanels(layout);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2471,6 +2558,127 @@ function dismissResetPopup() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  Side hole panels — desktop only, synchronized fade cycle
+//  Left:  course hole cards (hole-pip style, one at a time)
+//  Right: layout scorecard cards (scorecard-pip style, one at a time)
+//  Both cycle holes 1→9 in sync, fading in for 3s then out, then repeat
+// ═══════════════════════════════════════════════════════════════════
+let sidePanelLayout  = null;  // current layout object
+let sidePanelTimer   = null;  // interval handle
+let sidePanelIndex   = 0;     // current hole index 0–8
+
+const SIDE_HOLD_MS   = 3000;  // hold duration
+const SIDE_FADE_MS   = 600;   // matches CSS transition
+
+const COURSE_COLORS = {
+  'Sunshine Glade':    'var(--course-sunshine)',
+  'Blueberry Thicket': 'var(--course-blueberry)',
+  'Oak Hill':          'var(--course-oakhill)',
+  'Lakeside':          'var(--course-lakeside)',
+  'Windswept Fields':  'var(--course-windswept)',
+  'Harrowing Woods':   'var(--course-harrowing)',
+  'The Crows Nest':    'var(--course-crows)',
+  'Grizzly Gulch':     'var(--course-grizzly)'
+};
+
+function buildSidePanelHoles(layout) {
+  // Flatten layout into 9 holes with course name, color, hole number, par, dist
+  if (!layout || !layout.courses) return [];
+  const holes = [];
+  layout.courses.forEach((entry, ci) => {
+    const color = COURSE_COLORS[entry.course.name] || 'var(--green-neon)';
+    entry.holes.forEach((h, hi) => {
+      holes.push({
+        layoutHole:  ci * 3 + hi + 1,   // 1–9 sequential position
+        courseName:  entry.course.name,
+        courseNum:   ci + 1,
+        courseColor: color,
+        holeNum:     h.holeNum,
+        par:         h.par,
+        dist:        getHoleDist(entry.course.name, h.holeNum),
+      });
+    });
+  });
+  return holes;
+}
+
+function renderSidePanelSlide(index, holes) {
+  if (!holes || holes.length === 0) return;
+  const h = holes[index % holes.length];
+
+  const leftCard  = document.getElementById('sidePanelLeftCard');
+  const rightCard = document.getElementById('sidePanelRightCard');
+  if (!leftCard || !rightCard) return;
+
+  // Left: course hole card (hole-pip style showing hole number within the course)
+  leftCard.innerHTML = `
+    <div class="side-course-block" style="border-top: 2px solid ${h.courseColor};">
+      <div class="side-course-header">
+        <span class="side-course-num">Course ${h.courseNum}</span>
+        <span class="side-course-name" style="color:${h.courseColor};">${h.courseName}</span>
+      </div>
+      <div class="side-hole-pip" style="border-color:${h.courseColor};">
+        <span class="side-hole-pip-label">Hole</span>
+        <span class="side-hole-pip-num">${h.holeNum}</span>
+        <span class="side-hole-pip-par" style="color:${h.courseColor};">PAR ${h.par}</span>
+      </div>
+    </div>`;
+
+  // Right: layout scorecard card (sequential hole number with dist/par)
+  rightCard.innerHTML = `
+    <div class="side-hole-pip" style="border-color:${h.courseColor};">
+      <span class="side-hole-pip-label">Hole</span>
+      <span class="side-hole-pip-num">${h.layoutHole}</span>
+      <span class="side-hole-pip-dist">${h.dist}</span>
+      <span class="side-hole-pip-par" style="color:${h.courseColor};">PAR ${h.par}</span>
+    </div>`;
+}
+
+function sidePanelFadeIn() {
+  document.getElementById('sidePanelLeftCard').classList.add('visible');
+  document.getElementById('sidePanelRightCard').classList.add('visible');
+}
+
+function sidePanelFadeOut() {
+  document.getElementById('sidePanelLeftCard').classList.remove('visible');
+  document.getElementById('sidePanelRightCard').classList.remove('visible');
+}
+
+function sidePanelStep(holes) {
+  // Fade out current, then swap content, then fade in next
+  sidePanelFadeOut();
+  setTimeout(() => {
+    sidePanelIndex = (sidePanelIndex + 1) % holes.length;
+    renderSidePanelSlide(sidePanelIndex, holes);
+    sidePanelFadeIn();
+  }, SIDE_FADE_MS);
+}
+
+function startSidePanels(layout) {
+  // Only run on desktop
+  if (window.innerWidth < 1200) return;
+
+  if (sidePanelTimer) clearInterval(sidePanelTimer);
+  sidePanelLayout = layout;
+  sidePanelIndex  = 0;
+
+  const holes = buildSidePanelHoles(layout);
+  if (!holes.length) return;
+
+  sidePanelFadeOut();
+  setTimeout(() => {
+    renderSidePanelSlide(0, holes);
+    sidePanelFadeIn();
+    sidePanelTimer = setInterval(() => sidePanelStep(holes), SIDE_HOLD_MS + SIDE_FADE_MS);
+  }, 50);
+}
+
+function stopSidePanels() {
+  if (sidePanelTimer) { clearInterval(sidePanelTimer); sidePanelTimer = null; }
+  sidePanelFadeOut();
+}
+
 loadFlaggedPlayers();
 loadNerdPlayers();
 loadYesterdaySnapshot();
@@ -2713,6 +2921,13 @@ window.addEventListener('resize', applyMarquee);
     document.getElementById('holeNextBtn').disabled = slideshowCursor === slideshowHoles.length - 1;
   }
   </script>
+  <!-- ── Side hole panels (desktop only) ── -->
+  <div class="side-panel side-panel-left"  id="sidePanelLeft">
+    <div class="side-panel-card" id="sidePanelLeftCard"></div>
+  </div>
+  <div class="side-panel side-panel-right" id="sidePanelRight">
+    <div class="side-panel-card" id="sidePanelRightCard"></div>
+  </div>
 
 </body>
 </html>
