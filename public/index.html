@@ -289,7 +289,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 4px 0;
+      padding: 12px 0;
       overflow: hidden;
     }
     .side-section-title {
@@ -298,8 +298,21 @@
       color: var(--muted); text-transform: uppercase;
       text-align: center;
     }
-    /* Each hole section shows an actual hole photo with a caption below,
-       both constrained to fit within the section's allocated height. */
+    /* Title box in section 0 — mirrors .daily-window styling with a
+       yellow (#debc3e) border, matching the header title's font/glow. */
+    .side-title-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 3px solid #debc3e;
+      border-right: 3px solid #debc3e;
+      border-radius: 10px;
+      padding: 14px 10px;
+      width: 100%;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .side-title-svg { width: 100%; display: block; }
+
     .side-hole-pip {
       width: 100%;
       height: 100%;
@@ -2551,14 +2564,42 @@ function startSidePanels(layout) {
   const holes = buildSidePanelHoles(layout);
   if (holes.length < 9) return;
 
-  const titleText = document.querySelector('#scorecardSection .layout-section-label')
+  const fullTitle = document.querySelector('#scorecardSection .layout-section-label')
     ? document.querySelector('#scorecardSection .layout-section-label').textContent
     : "Today's Layout";
+  // Split "Today's Layout" / "Yesterday's Layout" into two lines
+  const parts    = fullTitle.toUpperCase().split(' ');
+  const line1    = parts[0] || "TODAY'S";
+  const line2    = parts[1] || 'LAYOUT';
 
-  // Left panel: title in section 0, hole photos 1-4 in sections 1-4
+  const titleHtml = `
+    <div class="side-title-box">
+      <svg class="side-title-svg" viewBox="0 0 200 70" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="sideTitleGlow" x="-8%" y="-15%" width="116%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feFlood flood-color="#4ab8e8" flood-opacity="0.5" result="color"/>
+            <feComposite in="color" in2="blur" operator="in" result="glow"/>
+            <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <text x="100" y="32" text-anchor="middle"
+          font-family="'Bebas Neue', Impact, sans-serif" font-size="32" font-weight="400"
+          fill="#eaeaea" stroke="#0a1520" stroke-width="2.5" stroke-linejoin="round"
+          paint-order="stroke fill" letter-spacing="3" filter="url(#sideTitleGlow)"
+        >${line1}</text>
+        <text x="100" y="64" text-anchor="middle"
+          font-family="'Bebas Neue', Impact, sans-serif" font-size="32" font-weight="400"
+          fill="#eaeaea" stroke="#0a1520" stroke-width="2.5" stroke-linejoin="round"
+          paint-order="stroke fill" letter-spacing="3" filter="url(#sideTitleGlow)"
+        >${line2}</text>
+      </svg>
+    </div>`;
+
+  // Left panel: title box in section 0, hole photos 1-4 in sections 1-4
   const leftIds = ['spL0', 'spL1', 'spL2', 'spL3', 'spL4'];
   const l0 = document.getElementById(leftIds[0]);
-  if (l0) l0.innerHTML = `<span class="side-section-title">${titleText}</span>`;
+  if (l0) l0.innerHTML = titleHtml;
   for (let i = 0; i < 4; i++) {
     const el = document.getElementById(leftIds[i + 1]);
     if (el) el.innerHTML = sideHolePhotoHtml(holes[i]);
