@@ -300,8 +300,8 @@
     }
     /* Title box in section 0 — mirrors .daily-window styling with a
        yellow (#debc3e) border, matching the header title's font/glow.
-       Sized to its content (text) rather than the full section height —
-       the parent .side-section already centers it vertically. */
+       Width and height are set via JS (matchTitleBoxSize) to exactly match
+       the rendered photo dimensions below it. */
     .side-title-box {
       background: var(--card);
       border: 1px solid var(--border);
@@ -311,6 +311,9 @@
       padding: 12px 10px;
       width: 100%;
       box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .side-title-svg {
       /* Legacy selector kept for compatibility; unused by current markup */
@@ -354,12 +357,15 @@
     }
     .side-hole-label {
       font-family: 'DM Mono', monospace;
-      font-size: 8px; letter-spacing: 1px;
+      font-size: 9px; letter-spacing: 1px;
       color: var(--muted); text-transform: uppercase;
-      text-align: center;
+      text-align: justify;
+      text-align-last: justify;
+      text-justify: inter-word;
       margin-top: 6px;
       display: block;
       flex-shrink: 0;
+      width: 100%;
     }
     .side-hole-label span { color: var(--white); }
   }
@@ -2611,23 +2617,24 @@ function startSidePanels(layout) {
   // Photos are height-constrained (object-fit:contain), so their rendered
   // width is narrower than the section's full width. Match the title box
   // width to the actual rendered photo width so both align visually.
-  matchTitleBoxWidth();
+  matchTitleBoxSize();
 }
 
-function matchTitleBoxWidth() {
+function matchTitleBoxSize() {
   const firstPhoto = document.querySelector('#spL1 .side-hole-img');
   const titleBox   = document.querySelector('#spL0 .side-title-box');
   if (!firstPhoto || !titleBox) return;
 
-  const applyWidth = () => {
-    const w = firstPhoto.getBoundingClientRect().width;
-    if (w > 0) titleBox.style.width = w + 'px';
+  const applySize = () => {
+    const rect = firstPhoto.getBoundingClientRect();
+    if (rect.width > 0)  titleBox.style.width  = rect.width  + 'px';
+    if (rect.height > 0) titleBox.style.height = rect.height + 'px';
   };
 
   if (firstPhoto.complete) {
-    applyWidth();
+    applySize();
   } else {
-    firstPhoto.addEventListener('load', applyWidth, { once: true });
+    firstPhoto.addEventListener('load', applySize, { once: true });
   }
 }
 
@@ -2635,7 +2642,7 @@ function matchTitleBoxWidth() {
 let _titleWidthResizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(_titleWidthResizeTimer);
-  _titleWidthResizeTimer = setTimeout(matchTitleBoxWidth, 150);
+  _titleWidthResizeTimer = setTimeout(matchTitleBoxSize, 150);
 });
 
 function stopSidePanels() {
