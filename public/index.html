@@ -299,19 +299,39 @@
       text-align: center;
     }
     /* Title box in section 0 — mirrors .daily-window styling with a
-       yellow (#debc3e) border, matching the header title's font/glow. */
+       yellow (#debc3e) border, matching the header title's font/glow.
+       height:100% + min-height:0 makes it match the photo sections'
+       allocated space instead of rendering at its natural SVG size. */
     .side-title-box {
       background: var(--card);
       border: 1px solid var(--border);
       border-left: 3px solid #debc3e;
       border-right: 3px solid #debc3e;
       border-radius: 10px;
-      padding: 14px 10px;
+      padding: 8px 10px;
       width: 100%;
+      height: 100%;
+      min-height: 0;
       box-sizing: border-box;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .side-title-svg { width: 100%; display: block; }
+    .side-title-svg {
+      /* Legacy selector kept for compatibility; unused by current markup */
+      display: none;
+    }
+    .side-title-text {
+      font-family: 'Bebas Neue', Impact, sans-serif;
+      font-size: 22px;
+      line-height: 1.15;
+      letter-spacing: 3px;
+      color: #eaeaea;
+      -webkit-text-stroke: 1px #0a1520;
+      text-shadow: 0 2px 2px rgba(0,0,0,0.5), 0 0 8px rgba(74,184,232,0.5);
+      text-align: center;
+      text-transform: uppercase;
+    }
 
     .side-hole-pip {
       width: 100%;
@@ -2574,26 +2594,7 @@ function startSidePanels(layout) {
 
   const titleHtml = `
     <div class="side-title-box">
-      <svg class="side-title-svg" viewBox="0 0 200 70" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <filter id="sideTitleGlow" x="-8%" y="-15%" width="116%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur"/>
-            <feFlood flood-color="#4ab8e8" flood-opacity="0.5" result="color"/>
-            <feComposite in="color" in2="blur" operator="in" result="glow"/>
-            <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-        <text x="100" y="32" text-anchor="middle"
-          font-family="'Bebas Neue', Impact, sans-serif" font-size="32" font-weight="400"
-          fill="#eaeaea" stroke="#0a1520" stroke-width="2.5" stroke-linejoin="round"
-          paint-order="stroke fill" letter-spacing="3" filter="url(#sideTitleGlow)"
-        >${line1}</text>
-        <text x="100" y="64" text-anchor="middle"
-          font-family="'Bebas Neue', Impact, sans-serif" font-size="32" font-weight="400"
-          fill="#eaeaea" stroke="#0a1520" stroke-width="2.5" stroke-linejoin="round"
-          paint-order="stroke fill" letter-spacing="3" filter="url(#sideTitleGlow)"
-        >${line2}</text>
-      </svg>
+      <div class="side-title-text">${line1}<br>${line2}</div>
     </div>`;
 
   // Left panel: title box in section 0, hole photos 1-4 in sections 1-4
