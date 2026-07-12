@@ -2607,7 +2607,36 @@ function startSidePanels(layout) {
     const el = document.getElementById(rightIds[i]);
     if (el) el.innerHTML = sideHolePhotoHtml(holes[i + 4]);
   }
+
+  // Photos are height-constrained (object-fit:contain), so their rendered
+  // width is narrower than the section's full width. Match the title box
+  // width to the actual rendered photo width so both align visually.
+  matchTitleBoxWidth();
 }
+
+function matchTitleBoxWidth() {
+  const firstPhoto = document.querySelector('#spL1 .side-hole-img');
+  const titleBox   = document.querySelector('#spL0 .side-title-box');
+  if (!firstPhoto || !titleBox) return;
+
+  const applyWidth = () => {
+    const w = firstPhoto.getBoundingClientRect().width;
+    if (w > 0) titleBox.style.width = w + 'px';
+  };
+
+  if (firstPhoto.complete) {
+    applyWidth();
+  } else {
+    firstPhoto.addEventListener('load', applyWidth, { once: true });
+  }
+}
+
+// Re-match on resize (debounced) since photo width changes with viewport
+let _titleWidthResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_titleWidthResizeTimer);
+  _titleWidthResizeTimer = setTimeout(matchTitleBoxWidth, 150);
+});
 
 function stopSidePanels() {
   ['spL0','spL1','spL2','spL3','spL4','spR0','spR1','spR2','spR3','spR4'].forEach(id => {
