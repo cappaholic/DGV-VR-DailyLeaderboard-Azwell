@@ -2575,10 +2575,14 @@ function buildSidePanelHoles(layout) {
 }
 
 function sideHolePhotoHtml(h) {
+  // Non-breaking spaces keep each metric group ("Hole 1", "PAR 4", "622 FT")
+  // tight internally — the justify-spacing on .side-hole-label then only
+  // stretches the gaps BETWEEN groups, not within them.
+  const distNbsp = h.dist.replace(' ', '&nbsp;');
   return `
     <div class="side-hole-pip">
       <img class="side-hole-img" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
-      <span class="side-hole-label">Hole <span>${h.layoutHole}</span> &middot; PAR ${h.par} &middot; ${h.dist}</span>
+      <span class="side-hole-label">Hole&nbsp;<span>${h.layoutHole}</span> &middot; PAR&nbsp;${h.par} &middot; ${distNbsp}</span>
     </div>`;
 }
 
