@@ -353,7 +353,10 @@
       min-height: 0;
       display: block;
       border-radius: 8px;
-      border: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-left: 3px solid var(--hole-color, var(--border));
+      border-right: 3px solid var(--hole-color, var(--border));
       box-shadow: 0 4px 16px rgba(0,0,0,0.4);
       opacity: 0.85;
     }
@@ -2557,17 +2560,30 @@ const SIDE_PHOTO_PREFIX = {
   'Grizzly Gulch':     'GG'
 };
 
+const SIDE_COURSE_COLORS = {
+  'Sunshine Glade':    'var(--course-sunshine)',
+  'Blueberry Thicket': 'var(--course-blueberry)',
+  'Oak Hill':          'var(--course-oakhill)',
+  'Lakeside':          'var(--course-lakeside)',
+  'Windswept Fields':  'var(--course-windswept)',
+  'Harrowing Woods':   'var(--course-harrowing)',
+  'The Crows Nest':    'var(--course-crows)',
+  'Grizzly Gulch':     'var(--course-grizzly)'
+};
+
 function buildSidePanelHoles(layout) {
   if (!layout || !layout.courses) return [];
   const holes = [];
   layout.courses.forEach((entry, ci) => {
     const prefix = SIDE_PHOTO_PREFIX[entry.course.name] || '';
+    const color  = SIDE_COURSE_COLORS[entry.course.name] || 'var(--green-neon)';
     entry.holes.forEach((h, hi) => {
       holes.push({
         layoutHole: ci * 3 + hi + 1,
         par:        h.par,
         dist:       getHoleDist(entry.course.name, h.holeNum),
         photo:      `holes/${prefix}${h.holeNum}.png`,
+        color:      color,
       });
     });
   });
@@ -2580,7 +2596,7 @@ function sideHolePhotoHtml(h) {
   // depending on browser text-justify behavior around whitespace.
   return `
     <div class="side-hole-pip">
-      <img class="side-hole-img" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
+      <img class="side-hole-img" style="--hole-color:${h.color}" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
       <div class="side-hole-label">
         <span class="side-hole-label-item">Hole <span class="side-hole-label-white">${h.layoutHole}</span></span>
         <span class="side-hole-label-item">PAR ${h.par}</span>
