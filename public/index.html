@@ -300,22 +300,17 @@
     }
     /* Title box in section 0 — mirrors .daily-window styling with a
        yellow (#debc3e) border, matching the header title's font/glow.
-       height:100% + min-height:0 makes it match the photo sections'
-       allocated space instead of rendering at its natural SVG size. */
+       Sized to its content (text) rather than the full section height —
+       the parent .side-section already centers it vertically. */
     .side-title-box {
       background: var(--card);
       border: 1px solid var(--border);
       border-left: 3px solid #debc3e;
       border-right: 3px solid #debc3e;
       border-radius: 10px;
-      padding: 8px 10px;
+      padding: 12px 10px;
       width: 100%;
-      height: 100%;
-      min-height: 0;
       box-sizing: border-box;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
     .side-title-svg {
       /* Legacy selector kept for compatibility; unused by current markup */
