@@ -321,11 +321,12 @@
     }
     .side-title-text {
       font-family: 'Bebas Neue', Impact, sans-serif;
+      font-weight: 700;
       font-size: 25px;
       line-height: 1.15;
       letter-spacing: 3px;
       color: #eaeaea;
-      -webkit-text-stroke: 1.75px #0a1520;
+      -webkit-text-stroke: 2.25px #0a1520;
       paint-order: stroke fill;
       text-shadow: 0 2px 2px rgba(0,0,0,0.5), 0 0 8px rgba(74,184,232,0.5);
       text-align: center;
@@ -2617,8 +2618,11 @@ function startSidePanels(layout) {
 
   // Photos are height-constrained (object-fit:contain), so their rendered
   // width is narrower than the section's full width. Match the title box
-  // width to the actual rendered photo width so both align visually.
+  // width to the actual rendered photo width so both align visually, and
+  // match each pip's width to its own photo so the justified caption text
+  // spans exactly the photo's width instead of the full panel width.
   matchTitleBoxSize();
+  matchAllHolePipWidths();
 }
 
 function matchTitleBoxSize() {
@@ -2639,11 +2643,30 @@ function matchTitleBoxSize() {
   }
 }
 
+function matchAllHolePipWidths() {
+  document.querySelectorAll('.side-hole-pip').forEach(pip => {
+    const img = pip.querySelector('.side-hole-img');
+    if (!img) return;
+    const apply = () => {
+      const w = img.getBoundingClientRect().width;
+      if (w > 0) pip.style.width = w + 'px';
+    };
+    if (img.complete) {
+      apply();
+    } else {
+      img.addEventListener('load', apply, { once: true });
+    }
+  });
+}
+
 // Re-match on resize (debounced) since photo width changes with viewport
 let _titleWidthResizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(_titleWidthResizeTimer);
-  _titleWidthResizeTimer = setTimeout(matchTitleBoxSize, 150);
+  _titleWidthResizeTimer = setTimeout(() => {
+    matchTitleBoxSize();
+    matchAllHolePipWidths();
+  }, 150);
 });
 
 function stopSidePanels() {
