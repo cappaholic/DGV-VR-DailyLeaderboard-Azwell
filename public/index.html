@@ -358,18 +358,18 @@
       opacity: 0.85;
     }
     .side-hole-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      width: 100%;
+      margin-top: 6px;
       font-family: 'DM Mono', monospace;
       font-size: 9px; letter-spacing: 1px;
       color: var(--muted); text-transform: uppercase;
-      text-align: justify;
-      text-align-last: justify;
-      text-justify: inter-word;
-      margin-top: 6px;
-      display: block;
       flex-shrink: 0;
-      width: 100%;
     }
-    .side-hole-label span { color: var(--white); }
+    .side-hole-label-item { white-space: nowrap; }
+    .side-hole-label-white { color: var(--white); }
   }
   .reset-overlay {
     display: none; position: fixed; inset: 0;
@@ -2575,14 +2575,17 @@ function buildSidePanelHoles(layout) {
 }
 
 function sideHolePhotoHtml(h) {
-  // Non-breaking spaces keep each metric group ("Hole 1", "PAR 4", "622 FT")
-  // tight internally — the justify-spacing on .side-hole-label then only
-  // stretches the gaps BETWEEN groups, not within them.
-  const distNbsp = h.dist.replace(' ', '&nbsp;');
+  // Three separate flex items with justify-content:space-between on the
+  // parent — this reliably spaces the three metric groups apart without
+  // depending on browser text-justify behavior around whitespace.
   return `
     <div class="side-hole-pip">
       <img class="side-hole-img" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
-      <span class="side-hole-label">Hole&nbsp;<span>${h.layoutHole}</span> &middot; PAR&nbsp;${h.par} &middot; ${distNbsp}</span>
+      <div class="side-hole-label">
+        <span class="side-hole-label-item">Hole <span class="side-hole-label-white">${h.layoutHole}</span></span>
+        <span class="side-hole-label-item">PAR ${h.par}</span>
+        <span class="side-hole-label-item">${h.dist}</span>
+      </div>
     </div>`;
 }
 
