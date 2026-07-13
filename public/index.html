@@ -2624,7 +2624,10 @@ function sideHolePhotoHtml(h) {
     </div>`;
 }
 
+let _lastSidePanelLayout = null;
+
 function startSidePanels(layout) {
+  _lastSidePanelLayout = layout;
   if (window.innerWidth < 1200) return;
   const holes = buildSidePanelHoles(layout);
   if (holes.length < 9) return;
@@ -2701,13 +2704,23 @@ function matchAllHolePipWidths() {
   });
 }
 
-// Re-match on resize (debounced) since photo width changes with viewport
+// Rebuild side panels on resize (debounced). Some browsers get stuck
+// rendering hole photos as broken/near-invisible icons if the window is
+// squeezed very short vertically, then don't recover when it's expanded
+// back — merely re-measuring the existing (already-broken) <img> elements
+// doesn't fix this. Rebuilding fresh <img> elements from scratch forces a
+// clean re-decode at the new size and resolves the stuck state reliably.
 let _titleWidthResizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(_titleWidthResizeTimer);
   _titleWidthResizeTimer = setTimeout(() => {
-    matchTitleBoxSize();
-    matchAllHolePipWidths();
+    if (window.innerWidth < 1200) return;
+    if (_lastSidePanelLayout) {
+      startSidePanels(_lastSidePanelLayout);
+    } else {
+      matchTitleBoxSize();
+      matchAllHolePipWidths();
+    }
   }, 150);
 });
 
