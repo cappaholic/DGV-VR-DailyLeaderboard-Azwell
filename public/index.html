@@ -326,9 +326,21 @@
       line-height: 1.15;
       letter-spacing: 3px;
       color: #eaeaea;
-      -webkit-text-stroke: 2.25px #0a1520;
-      paint-order: stroke fill;
-      text-shadow: 0 2px 2px rgba(0,0,0,0.5), 0 0 8px rgba(74,184,232,0.5);
+      /* Outline built from stacked text-shadows instead of -webkit-text-stroke
+         + paint-order — that combination is unreliable for plain HTML text on
+         Safari/Mac, where the stroke can render on top of the fill instead of
+         behind it, making the text look solid black. text-shadow always
+         renders behind the fill, identically across every browser. */
+      text-shadow:
+        -1.5px -1.5px 0 #0a1520,
+         1.5px -1.5px 0 #0a1520,
+        -1.5px  1.5px 0 #0a1520,
+         1.5px  1.5px 0 #0a1520,
+         -1.5px 0     0 #0a1520,
+          1.5px 0     0 #0a1520,
+          0    -1.5px 0 #0a1520,
+          0     1.5px 0 #0a1520,
+          0 0 8px rgba(74,184,232,0.5);
       text-align: center;
       text-transform: uppercase;
     }
