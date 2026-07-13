@@ -1405,14 +1405,12 @@ function renderSnapshotLeaderboard(snap) {
     // Pre-cutoff data is excluded from all calculations (player rating, avg, best/worst)
     // by DATA_CUTOFF_DATE filtering in buildAllRatings and renderHistoryContent.
     // Showing the number here is visual only and does not feed any calculation.
-    const yPar    = seededPar || 31;
-    const yVsPar  = rawScore - yPar;
     const _yNow   = new Date();
     const _yUTC   = new Date(Date.UTC(_yNow.getUTCFullYear(), _yNow.getUTCMonth(), _yNow.getUTCDate()));
     const _yDate  = new Date(_yUTC.getTime() - 86400000).toISOString().slice(0, 10);
     const yDate   = yesterdaySnapshot && yesterdaySnapshot.date ? yesterdaySnapshot.date : _yDate;
-    const yDiff   = dgvDailyDifficulty[yDate] !== undefined ? dgvDailyDifficulty[yDate] : 0;
-    const yRR     = flagged ? null : Math.round(1000 - (yVsPar - yDiff) * RATING_PTS);
+    const ySSA    = dgvDailySSA[yDate] !== undefined ? dgvDailySSA[yDate] : null;
+    const yRR     = (flagged || ySSA === null) ? null : Math.round(1000 + (ySSA - rawScore) * RATING_PTS);
     const yrDisplay = yRR !== null
       ? `<div class="score-vs-par" style="font-size:20px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
       : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
@@ -1977,14 +1975,17 @@ function renderHistoryContent(playerName, days) {
   // This is NOT recalculated live; it only changes on the next Sunday run.
   let ratingRowHtml = '';
   {
-    const playerRatingData = getPlayerRating(playerName);
+    const playerRatingData = getPlayerRatingDisplay(playerName);
     if (playerRatingData) {
       const rating      = playerRatingData.rating;
       const provisional = playerRatingData.provisional;
       const bestRound    = playerRatingData.best_round;
       const worstRound   = playerRatingData.worst_round;
+      const badgeText = playerRatingData.isLive
+        ? 'Provisional &middot; Live Estimate'
+        : 'Provisional';
       const provBadge = provisional
-        ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;display:block;margin-top:2px;">Provisional</span>`
+        ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;display:block;margin-top:2px;">${badgeText}</span>`
         : '';
       ratingRowHtml = `
         <div class="history-stat-row dgv-rating-row">
@@ -2290,10 +2291,13 @@ function renderTop50List() {
   }
 
   // Top 50 eligibility: 8+ rounds required, matching PDGA's propagator threshold.
-  // Provisional players (< 8 rounds) show ratings in their own modal but not here.
-  // This mirrors PDGA's system where sustained play is required for leaderboard standing.
+  // This is INDEPENDENT of the "provisional" flag (which now just means
+  // "hasn't had a first official calculation yet" — see calculate_ratings.py).
+  // A player can be non-provisional (already officially calculated once) but
+  // still ineligible here until they've logged enough rounds for a reliable
+  // ranking, matching PDGA's expectation of sustained play for standing.
   const allSorted = Object.entries(allRatings)
-    .filter(([, d]) => !d.provisional)
+    .filter(([, d]) => (d.rounds_counted || 0) >= RATING_PROVISIONAL_ROUNDS)
     .sort((a, b) => b[1].rating - a[1].rating);
 
   // Minimum 10 eligible players before showing the leaderboard at all.
@@ -2375,24 +2379,27 @@ function renderTop50List() {
 //  Round Rating = 1000 − (vsPar − dailyDifficulty) × 4.5
 //  Player Rating = weighted rolling avg of round ratings (recent 25% 2×)
 // ═══════════════════════════════════════════════════════════════════
-const RATING_PTS                 = 4.5;  // fixed pts/stroke
+const RATING_PTS                 = 8.0;  // pts/stroke — matches calculate_ratings.py
 const RATING_PROPAGATOR_MIN_DAYS = 8;    // min rounds to be a propagator (PDGA standard)
-const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to trust difficulty offset
-const RATING_MIN_ROUNDS          = 1;    // min rounds to display a rating (PDGA gives rating after 1 round)
-const RATING_PROVISIONAL_ROUNDS  = 8;    // rounds before "provisional" badge drops + Top 50 eligibility
+const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to compute SSA
+const RATING_MIN_ROUNDS          = 1;    // min rounds to display a rating
+const RATING_PROVISIONAL_ROUNDS  = 8;    // min rounds_counted for Top 50 leaderboard eligibility
+                                          // (does NOT control the "provisional" tag itself —
+                                          // that comes directly from ratings.json / a live estimate)
 
-// Expose daily difficulty so yesterday renderer can apply correct offset
-let dgvDailyDifficulty = {};
+// Expose daily SSA so yesterday renderer can apply the correct value
+let dgvDailySSA = {};
 
-// Compute propagator career averages (flagged players excluded)
-function buildPropagators(history) {
+// Propagator career average RAW SCORE, using FULL history (pre+post cutoff)
+// to maximize the propagator pool — must match calculate_ratings.py.
+function buildPropagators(fullHistory) {
   const totals = {};
   const counts = {};
-  history.forEach(day => {
+  fullHistory.forEach(day => {
     day.players.forEach(p => {
       const name = stripDiscTag(p.name);
       if (isFlagged(name)) return;
-      totals[name] = (totals[name] || 0) + p.vsPar;
+      totals[name] = (totals[name] || 0) + p.score;
       counts[name] = (counts[name] || 0) + 1;
     });
   });
@@ -2405,28 +2412,33 @@ function buildPropagators(history) {
   return props;
 }
 
-// Compute per-day difficulty offset using propagators
-function buildDailyDifficulty(history, propagators) {
-  const difficulty = {};
+// SSA for each day = average raw score of propagators who played that day.
+// Fallback: trimmed mean of best 60% of scores when propagators are scarce.
+// Uses post-cutoff history only for actual day scores. Par is never used.
+function buildDailySSA(history, propagators) {
+  const ssa = {};
   history.forEach(day => {
     const props = day.players.filter(p => {
       const name = stripDiscTag(p.name);
       return !isFlagged(name) && propagators.hasOwnProperty(name);
     });
     if (props.length < RATING_MIN_PROPAGATORS) {
-      difficulty[day.date] = 0;
+      const scores = day.players.map(p => p.score).sort((a, b) => a - b);
+      const trimN  = Math.max(1, Math.floor(scores.length * 0.60));
+      const trimmed = scores.slice(0, trimN);
+      ssa[day.date] = trimmed.reduce((s, v) => s + v, 0) / trimmed.length;
       return;
     }
-    const offsets = props.map(p => p.vsPar - propagators[stripDiscTag(p.name)]);
-    difficulty[day.date] = offsets.reduce((s, v) => s + v, 0) / offsets.length;
+    const propScores = props.map(p => p.score);
+    ssa[day.date] = propScores.reduce((s, v) => s + v, 0) / propScores.length;
   });
-  dgvDailyDifficulty = difficulty; // expose globally for yesterday renderer
-  return difficulty;
+  dgvDailySSA = ssa; // expose globally for yesterday renderer
+  return ssa;
 }
 
-// Compute a single round rating
-function computeRoundRating(vsPar, difficultyOffset) {
-  return 1000 - (vsPar - difficultyOffset) * RATING_PTS;
+// Compute a single round rating: 1000 + (SSA - playerScore) x RATING_PTS
+function computeRoundRating(playerScore, ssa) {
+  return 1000 + (ssa - playerScore) * RATING_PTS;
 }
 
 // Compute rolling player rating from array of round ratings
@@ -2470,24 +2482,25 @@ function buildAllRatings(history) {
   if (dgvRatingCache) return dgvRatingCache;
   if (!history || history.length === 0) return {};
 
-  // Only use post-cutoff data for all rating calculations
   const filteredHistory = history.filter(day => day.date >= DATA_CUTOFF_DATE);
   if (filteredHistory.length === 0) return {};
 
-  const propagators  = buildPropagators(filteredHistory);
-  const difficulty   = buildDailyDifficulty(filteredHistory, propagators);
+  // Propagators from FULL history (pre+post cutoff) to maximize the pool —
+  // daily SSA computed from post-cutoff scores only. Matches calculate_ratings.py.
+  const propagators = buildPropagators(history);
+  const dailySSA    = buildDailySSA(filteredHistory, propagators);
 
-  const playerRounds = {}; // name -> [{date, vsPar, par, roundRating}]
+  const playerRounds = {}; // name -> [{date, score, vsPar, roundRating}]
 
   filteredHistory.forEach(day => {
-    const diff = difficulty[day.date] || 0;
-    const par  = day.par;
+    const ssa = dailySSA[day.date];
+    if (ssa === undefined) return;
     day.players.forEach(p => {
       const name = stripDiscTag(p.name);
       if (isFlagged(name)) return;
-      const rr = computeRoundRating(p.vsPar, diff);
+      const rr = computeRoundRating(p.score, ssa);
       if (!playerRounds[name]) playerRounds[name] = [];
-      playerRounds[name].push({ date: day.date, vsPar: p.vsPar, par, roundRating: rr });
+      playerRounds[name].push({ date: day.date, score: p.score, vsPar: p.vsPar, roundRating: rr });
     });
   });
 
@@ -2732,6 +2745,28 @@ async function loadRatingsData() {
 function getPlayerRating(playerName) {
   if (!ratingsData || !ratingsData.players) return null;
   return ratingsData.players[playerName] || null;
+}
+
+// Official rating if one exists; otherwise a LIVE-computed estimate for a
+// brand-new player who hasn't been through a Sunday calculation yet — using
+// the same SSA formula as the backend. Always marked provisional, mirroring
+// PDGA's "Preliminary Rating" shown before a player's first Official Update.
+function getPlayerRatingDisplay(playerName) {
+  const official = getPlayerRating(playerName);
+  if (official) return { ...official, isLive: false };
+
+  if (!historyData || historyData.length === 0) return null;
+  const liveRatings = buildAllRatings(historyData);
+  const liveData = liveRatings[playerName];
+  if (!liveData) return null;
+
+  return {
+    rating:      liveData.rating,
+    provisional: true,
+    best_round:  liveData.bestRound,
+    worst_round: liveData.worstRound,
+    isLive:      true,
+  };
 }
 
 loadFlaggedPlayers();
