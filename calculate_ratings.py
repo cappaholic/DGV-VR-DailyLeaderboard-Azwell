@@ -144,13 +144,32 @@ def compute_rolling_rating(round_ratings: list) -> float | None:
     return w_avg
 
 
+def load_previously_graduated(path: Path) -> set:
+    """
+    Players who were non-provisional in the last ratings.json run.
+    Once a player crosses the 8-round threshold, they should never show
+    Provisional again — even if a later week's rolling window happens to
+    contain fewer than 8 rounds (e.g. an inactive stretch). This reads the
+    ratings.json this run is about to overwrite, so "graduated" status
+    persists permanently across every future weekly calculation.
+    """
+    try:
+        data = json.loads(path.read_text())
+        players = data.get('players', {})
+        return {name for name, d in players.items() if not d.get('provisional', True)}
+    except Exception:
+        return set()
+
+
 def main():
     print(f"[{datetime.now(timezone.utc).isoformat()}] DGV VR Rating Calculator starting...")
 
     history_all = json.loads(HISTORY_FILE.read_text())
     flagged     = load_flagged(FLAGGED_FILE)
+    graduated   = load_previously_graduated(RATINGS_FILE)
     print(f"  History days (total):           {len(history_all)}")
     print(f"  Flagged players:                {len(flagged)}")
+    print(f"  Previously graduated players:   {len(graduated)}")
 
     # Apply data cutoff
     history = [d for d in history_all if d['date'] >= DATA_CUTOFF_DATE]
@@ -210,9 +229,16 @@ def main():
         if rating is None:
             continue
 
+        # Once a player has crossed the 8-round threshold in any past week,
+        # they stay non-provisional forever — even if this week's rolling
+        # window happens to contain fewer than 8 rounds.
+        is_provisional = len(windowed) < RATING_PROVISIONAL_ROUNDS
+        if name in graduated:
+            is_provisional = False
+
         players_out[name] = {
             "rating":         round(rating),
-            "provisional":    len(windowed) < RATING_PROVISIONAL_ROUNDS,
+            "provisional":    is_provisional,
             "rounds_counted": len(windowed),
             "total_rounds":   len(all_rounds),
             "used_fallback":  used_fallback,
