@@ -2007,6 +2007,30 @@ function renderHistoryContent(playerName, days) {
         </div>`;
     } else if (!ratingsLoaded) {
       ratingRowHtml = `<div class="history-unavailable" style="padding:16px;">Loading rating&hellip;</div>`;
+    } else {
+      // Fewer than 3 rounds — no rating yet, but still show Best/Worst
+      // Round from whatever post-cutoff rounds exist, if any.
+      const bw = computeAnyBestWorst(playerName);
+      const bestRound  = bw ? bw.bestRound  : null;
+      const worstRound = bw ? bw.worstRound : null;
+      ratingRowHtml = `
+        <div class="history-stat-row dgv-rating-row">
+          <div class="history-stat" style="flex:1;">
+            <span class="history-stat-label">DGV VR Rating</span>
+            <span class="history-stat-value" style="font-size:18px;color:var(--muted);">Not enough data</span>
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;display:block;margin-top:2px;">${RATING_MIN_ROUNDS} round minimum required</span>
+          </div>
+          <div class="history-stat-col" style="gap:6px;">
+            <div class="history-stat">
+              <span class="history-stat-label">Best Round</span>
+              <span class="history-stat-value under" style="font-size:18px;">${bestRound !== null ? bestRound : '—'}</span>
+            </div>
+            <div class="history-stat">
+              <span class="history-stat-label">Worst Round</span>
+              <span class="history-stat-value over" style="font-size:18px;">${worstRound !== null ? worstRound : '—'}</span>
+            </div>
+          </div>
+        </div>`;
     }
     // If ratingsLoaded but no record exists, player has never appeared in a
     // Sunday calculation yet — silently show nothing, same as before.
@@ -2778,6 +2802,26 @@ function getPlayerRatingDisplay(playerName) {
     worst_round: liveData.worstRound,
     isLive:      true,
   };
+}
+
+// Best/Worst Round shown even below the 3-round rating minimum — uses
+// whatever post-cutoff rounds exist (even just 1), reusing dgvDailySSA
+// which is already populated once history loads. Returns null only if
+// the player has zero post-cutoff rounds at all.
+function computeAnyBestWorst(playerName) {
+  if (!historyData || historyData.length === 0) return null;
+  if (isFlagged(playerName)) return null;
+  const filtered = historyData.filter(day => day.date >= DATA_CUTOFF_DATE);
+  const ratings = [];
+  filtered.forEach(day => {
+    const ssa = dgvDailySSA[day.date];
+    if (ssa === undefined) return;
+    const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
+    if (!me) return;
+    ratings.push(computeRoundRating(me.score, ssa));
+  });
+  if (ratings.length === 0) return null;
+  return { bestRound: Math.round(Math.max(...ratings)), worstRound: Math.round(Math.min(...ratings)) };
 }
 
 loadFlaggedPlayers();
