@@ -28,10 +28,10 @@ RATING_PTS                 = 8.0    # pts/stroke — calibrated against the all-
                                      # under the single best event rating ever recorded (1088).
 RATING_PROPAGATOR_MIN_DAYS = 8      # min rounds to be a propagator (PDGA standard)
 RATING_MIN_PROPAGATORS     = 3      # min propagators needed to compute SSA
-RATING_MIN_ROUNDS          = 1      # min rounds to display a rating
-RATING_PROVISIONAL_ROUNDS  = 8      # min rounds_counted for Top-N leaderboard eligibility
-                                     # (no longer controls the "provisional" tag itself —
-                                     # see load_previously_seen / is_provisional below)
+RATING_MIN_ROUNDS          = 3      # min rounds before a rating is calculated at all
+RATING_PROVISIONAL_ROUNDS  = 7      # rounds_counted needed at a Sunday calculation to
+                                     # permanently drop the "provisional" tag (also gates
+                                     # Top-N leaderboard eligibility via the same flag)
 
 DATA_CUTOFF_DATE           = '2026-07-03'  # only post-cutoff data used in calculations
 
@@ -150,19 +150,24 @@ def compute_rolling_rating(round_ratings: list) -> float | None:
     return w_avg
 
 
-def load_previously_seen(path: Path) -> set:
+def load_previously_graduated(path: Path) -> set:
     """
-    Players who appeared in ANY previous ratings.json run, regardless of
-    round count at the time. Mirrors real PDGA behavior: a new member gets
-    a Preliminary Rating the moment they play, which becomes Official the
-    moment the next scheduled ratings update includes them — permanently,
-    with no round-count minimum to "graduate." The 8-round threshold still
-    gates Top-N leaderboard eligibility (via rounds_counted), but no longer
-    controls the "provisional" display tag itself.
+    Players who were already non-provisional in the last ratings.json run.
+    Once a Sunday calculation finds a player with 7+ rounds_counted, they
+    stay non-provisional permanently — even if a later week's rolling
+    window happens to contain fewer than 7 rounds (e.g. an inactive
+    stretch). This reads the ratings.json this run is about to overwrite,
+    so "graduated" status persists across every future weekly calculation.
+
+    Example: a player with 6 rounds at one Sunday's calculation stays
+    provisional. If they play 1+ more round before the next Sunday
+    (reaching 7+ counted rounds), that next calculation drops the tag
+    permanently.
     """
     try:
         data = json.loads(path.read_text())
-        return set(data.get('players', {}).keys())
+        players = data.get('players', {})
+        return {name for name, d in players.items() if not d.get('provisional', True)}
     except Exception:
         return set()
 
@@ -172,10 +177,10 @@ def main():
 
     history_all      = json.loads(HISTORY_FILE.read_text())
     flagged          = load_flagged(FLAGGED_FILE)
-    previously_seen  = load_previously_seen(RATINGS_FILE)
+    graduated        = load_previously_graduated(RATINGS_FILE)
     print(f"  History days (total):           {len(history_all)}")
     print(f"  Flagged players:                {len(flagged)}")
-    print(f"  Previously calculated players:  {len(previously_seen)}")
+    print(f"  Previously graduated players:   {len(graduated)}")
 
     # Apply data cutoff
     history = [d for d in history_all if d['date'] >= DATA_CUTOFF_DATE]
@@ -235,13 +240,13 @@ def main():
         if rating is None:
             continue
 
-        # Provisional now means "this is the player's first-ever appearance
-        # in an official ratings.json" — matching real PDGA behavior where a
-        # new member's rating becomes Official the moment the next update
-        # includes them, with no round-count minimum required to graduate.
-        # The 8-round threshold (rounds_counted) still separately gates
-        # Top-N leaderboard eligibility — see index.html for that check.
-        is_provisional = name not in previously_seen
+        # Provisional = fewer than RATING_PROVISIONAL_ROUNDS (7) counted rounds
+        # at this calculation. Once a player crosses that threshold at any
+        # Sunday run, they stay non-provisional permanently — even if a much
+        # later week's rolling window happens to dip back under 7 rounds.
+        is_provisional = len(windowed) < RATING_PROVISIONAL_ROUNDS
+        if name in graduated:
+            is_provisional = False
 
         players_out[name] = {
             "rating":         round(rating),
