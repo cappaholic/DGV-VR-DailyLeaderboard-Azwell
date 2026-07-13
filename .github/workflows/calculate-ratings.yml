@@ -1,20 +1,36 @@
 name: Calculate DGV VR Ratings
 
 on:
-  # Runs every Monday at 00:30 UTC (after Sunday's 23:58 snapshot completes)
-  schedule:
-    - cron: '30 0 * * 1'
+  # Fires automatically the moment the nightly snapshot workflow completes —
+  # tightly coupled to actual completion instead of guessing a fixed clock
+  # time. This avoids GitHub's cron scheduling delay (observed up to 4+
+  # hours late on a plain cron trigger). A guard below only lets the
+  # calculation actually run if that snapshot was for a Sunday.
+  workflow_run:
+    workflows: ["Snapshot Daily Leaderboard"]
+    types: [completed]
 
-  # Also allow manual trigger from GitHub Actions UI
+  # Cron safety net in case workflow_run chaining doesn't fire for any
+  # reason (e.g. a temporary GitHub outage). Same Sunday guard applies,
+  # so this can never double-run or fire on the wrong day.
+  schedule:
+    - cron: '30 0 * * 1'   # 00:30 UTC Monday ≈ shortly after Sunday's reset
+
+  # Manual trigger for testing or forcing a recalculation at any time.
   workflow_dispatch:
     inputs:
       force:
-        description: 'Force recalculation even if ratings.json is recent'
+        description: 'Force recalculation regardless of day'
         required: false
-        default: 'false'
+        default: false
+        type: boolean
 
 jobs:
   calculate:
+    # Only proceed if the snapshot succeeded (skip on failure/cancel).
+    # Cron and manual triggers have no workflow_run context, so they
+    # always pass this check and fall through to the day guard below.
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -28,10 +44,39 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Guard — only calculate on the Sunday-reset snapshot
+        id: guard
+        run: |
+          FORCE="${{ github.event.inputs.force }}"
+          if [ "$FORCE" = "true" ]; then
+            echo "Forced run — skipping day check."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LAST_DATE=$(python3 -c "import json; d=json.load(open('public/history.json')); print(d[-1]['date'] if d else '')")
+          if [ -z "$LAST_DATE" ]; then
+            echo "No history data found — skipping."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          WEEKDAY=$(date -u -d "$LAST_DATE" +%u)   # 1=Mon ... 7=Sun
+          echo "Most recent snapshot date: $LAST_DATE (ISO weekday $WEEKDAY)"
+          if [ "$WEEKDAY" = "7" ]; then
+            echo "This is a Sunday snapshot — proceeding."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not a Sunday snapshot — skipping ratings calculation."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run rating calculator
+        if: steps.guard.outputs.proceed == 'true'
         run: python calculate_ratings.py
 
       - name: Commit ratings.json
+        if: steps.guard.outputs.proceed == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
