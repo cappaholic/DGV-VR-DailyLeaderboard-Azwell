@@ -2032,8 +2032,8 @@ function renderHistoryContent(playerName, days) {
     el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">No post-reset data for this player<br>in the last ${days} days</div>`;
     return;
   }
-  if (played.length < 2) {
-    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">2 day minimum required</span></div>`;
+  if (played.length < 3) {
+    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">3 day minimum required</span></div>`;
     return;
   }
 
@@ -2059,7 +2059,7 @@ function renderHistoryContent(playerName, days) {
 
   // ── Best/worst ─────────────────────────────────────────────────────
   // `played` is already filtered to post-cutoff data, so use it directly.
-  const bestWorstUnlocked = played.length >= 2;
+  const bestWorstUnlocked = played.length >= 3;
 
   let bestWorstRowHtml = '';
   if (bestWorstUnlocked) {
@@ -2290,14 +2290,12 @@ function renderTop50List() {
     return;
   }
 
-  // Top 50 eligibility: 8+ rounds required, matching PDGA's propagator threshold.
-  // This is INDEPENDENT of the "provisional" flag (which now just means
-  // "hasn't had a first official calculation yet" — see calculate_ratings.py).
-  // A player can be non-provisional (already officially calculated once) but
-  // still ineligible here until they've logged enough rounds for a reliable
-  // ranking, matching PDGA's expectation of sustained play for standing.
+  // Top 50 eligibility: non-provisional, matching PDGA's propagator-style
+  // threshold (7+ rounds_counted at any Sunday calculation, permanent once
+  // earned). Provisional and leaderboard eligibility are the same gate again
+  // now that "provisional" is round-count-based — see calculate_ratings.py.
   const allSorted = Object.entries(allRatings)
-    .filter(([, d]) => (d.rounds_counted || 0) >= RATING_PROVISIONAL_ROUNDS)
+    .filter(([, d]) => !d.provisional)
     .sort((a, b) => b[1].rating - a[1].rating);
 
   // Minimum 10 eligible players before showing the leaderboard at all.
@@ -2382,10 +2380,10 @@ function renderTop50List() {
 const RATING_PTS                 = 8.0;  // pts/stroke — matches calculate_ratings.py
 const RATING_PROPAGATOR_MIN_DAYS = 8;    // min rounds to be a propagator (PDGA standard)
 const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to compute SSA
-const RATING_MIN_ROUNDS          = 1;    // min rounds to display a rating
-const RATING_PROVISIONAL_ROUNDS  = 8;    // min rounds_counted for Top 50 leaderboard eligibility
-                                          // (does NOT control the "provisional" tag itself —
-                                          // that comes directly from ratings.json / a live estimate)
+const RATING_MIN_ROUNDS          = 3;    // min rounds before a rating is calculated at all
+const RATING_PROVISIONAL_ROUNDS  = 7;    // rounds_counted needed to drop "provisional" and
+                                          // gate Top 50 leaderboard eligibility — matches
+                                          // calculate_ratings.py exactly
 
 // Expose daily SSA so yesterday renderer can apply the correct value
 let dgvDailySSA = {};
