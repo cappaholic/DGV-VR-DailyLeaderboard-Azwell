@@ -21,11 +21,17 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ── Constants (must match index.html exactly) ─────────────────────────────────
-RATING_PTS                 = 9      # pts/stroke — calibrated to real post-cutoff data
+RATING_PTS                 = 8.0    # pts/stroke — calibrated against the all-time top 175
+                                     # PDGA "Event Ratings" (avg round rating per tournament).
+                                     # Lands DGV VR's most dominant players (~1064-1066) at the
+                                     # median of that list (1066.5); best individual rounds stay
+                                     # under the single best event rating ever recorded (1088).
 RATING_PROPAGATOR_MIN_DAYS = 8      # min rounds to be a propagator (PDGA standard)
 RATING_MIN_PROPAGATORS     = 3      # min propagators needed to compute SSA
 RATING_MIN_ROUNDS          = 1      # min rounds to display a rating
-RATING_PROVISIONAL_ROUNDS  = 8      # rounds before provisional badge drops
+RATING_PROVISIONAL_ROUNDS  = 8      # min rounds_counted for Top-N leaderboard eligibility
+                                     # (no longer controls the "provisional" tag itself —
+                                     # see load_previously_seen / is_provisional below)
 
 DATA_CUTOFF_DATE           = '2026-07-03'  # only post-cutoff data used in calculations
 
@@ -144,19 +150,19 @@ def compute_rolling_rating(round_ratings: list) -> float | None:
     return w_avg
 
 
-def load_previously_graduated(path: Path) -> set:
+def load_previously_seen(path: Path) -> set:
     """
-    Players who were non-provisional in the last ratings.json run.
-    Once a player crosses the 8-round threshold, they should never show
-    Provisional again — even if a later week's rolling window happens to
-    contain fewer than 8 rounds (e.g. an inactive stretch). This reads the
-    ratings.json this run is about to overwrite, so "graduated" status
-    persists permanently across every future weekly calculation.
+    Players who appeared in ANY previous ratings.json run, regardless of
+    round count at the time. Mirrors real PDGA behavior: a new member gets
+    a Preliminary Rating the moment they play, which becomes Official the
+    moment the next scheduled ratings update includes them — permanently,
+    with no round-count minimum to "graduate." The 8-round threshold still
+    gates Top-N leaderboard eligibility (via rounds_counted), but no longer
+    controls the "provisional" display tag itself.
     """
     try:
         data = json.loads(path.read_text())
-        players = data.get('players', {})
-        return {name for name, d in players.items() if not d.get('provisional', True)}
+        return set(data.get('players', {}).keys())
     except Exception:
         return set()
 
@@ -164,12 +170,12 @@ def load_previously_graduated(path: Path) -> set:
 def main():
     print(f"[{datetime.now(timezone.utc).isoformat()}] DGV VR Rating Calculator starting...")
 
-    history_all = json.loads(HISTORY_FILE.read_text())
-    flagged     = load_flagged(FLAGGED_FILE)
-    graduated   = load_previously_graduated(RATINGS_FILE)
+    history_all      = json.loads(HISTORY_FILE.read_text())
+    flagged          = load_flagged(FLAGGED_FILE)
+    previously_seen  = load_previously_seen(RATINGS_FILE)
     print(f"  History days (total):           {len(history_all)}")
     print(f"  Flagged players:                {len(flagged)}")
-    print(f"  Previously graduated players:   {len(graduated)}")
+    print(f"  Previously calculated players:  {len(previously_seen)}")
 
     # Apply data cutoff
     history = [d for d in history_all if d['date'] >= DATA_CUTOFF_DATE]
@@ -180,7 +186,7 @@ def main():
             "generated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "generated_ts": datetime.now(timezone.utc).isoformat(),
             "cutoff_date":  DATA_CUTOFF_DATE,
-            "method":       "SSA-anchored, 9pts/stroke — no par anchor (true PDGA method)",
+            "method":       "SSA-anchored, 8.0pts/stroke — no par anchor (true PDGA method)",
             "propagators":  0,
             "players":      {},
         }
@@ -229,12 +235,13 @@ def main():
         if rating is None:
             continue
 
-        # Once a player has crossed the 8-round threshold in any past week,
-        # they stay non-provisional forever — even if this week's rolling
-        # window happens to contain fewer than 8 rounds.
-        is_provisional = len(windowed) < RATING_PROVISIONAL_ROUNDS
-        if name in graduated:
-            is_provisional = False
+        # Provisional now means "this is the player's first-ever appearance
+        # in an official ratings.json" — matching real PDGA behavior where a
+        # new member's rating becomes Official the moment the next update
+        # includes them, with no round-count minimum required to graduate.
+        # The 8-round threshold (rounds_counted) still separately gates
+        # Top-N leaderboard eligibility — see index.html for that check.
+        is_provisional = name not in previously_seen
 
         players_out[name] = {
             "rating":         round(rating),
@@ -255,7 +262,7 @@ def main():
         "generated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "generated_ts": datetime.now(timezone.utc).isoformat(),
         "cutoff_date":  DATA_CUTOFF_DATE,
-        "method":       "SSA-anchored, 9pts/stroke — no par anchor (true PDGA method)",
+        "method":       "SSA-anchored, 8.0pts/stroke — no par anchor (true PDGA method)",
         "window_days":  RATING_WINDOW_DAYS,
         "propagators":  len(propagators),
         "players":      players_sorted,
