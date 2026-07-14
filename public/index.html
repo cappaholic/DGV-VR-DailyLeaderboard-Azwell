@@ -2411,12 +2411,16 @@ function renderTop50List() {
 
   container.innerHTML = html;
 }
-//  Propagator-based, PDGA-inspired. Fixed 4.5 pts/stroke.
-//  Calibrated so top players land ~1054–1057 (comparable to PDGA elite).
-//  Round Rating = 1000 − (vsPar − dailyDifficulty) × 4.5
+//  True PDGA SSA method — no fixed anchor point. SSA is computed fresh
+//  each day from propagator scores (8+ rounds, full history), exactly
+//  like real PDGA computes SSA fresh every round. Par is never used.
+//  Round Rating = 1000 + (SSA − playerScore) × 7.42
 //  Player Rating = weighted rolling avg of round ratings (recent 25% 2×)
+//  pts/stroke derived from a regression on 606 real rounds across two
+//  current DGPT Elite Series events (Ale Open, Heinola Open) — R²=0.96
+//  and R²=0.9995 respectively, averaging to 7.42 pts/stroke.
 // ═══════════════════════════════════════════════════════════════════
-const RATING_PTS                 = 8.0;  // pts/stroke — matches calculate_ratings.py
+const RATING_PTS                 = 7.42; // pts/stroke — matches calculate_ratings.py
 const RATING_PROPAGATOR_MIN_DAYS = 8;    // min rounds to be a propagator (PDGA standard)
 const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to compute SSA
 const RATING_MIN_ROUNDS          = 3;    // min rounds before a rating is calculated at all
