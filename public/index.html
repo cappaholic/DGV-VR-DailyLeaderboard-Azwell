@@ -2038,11 +2038,11 @@ function renderHistoryContent(playerName, days) {
           <div class="history-stat-col" style="gap:6px;">
             <div class="history-stat">
               <span class="history-stat-label">Best Round</span>
-              <span class="history-stat-value under" style="font-size:18px;">${bestRound !== null ? bestRound : '—'}</span>
+              <span class="history-stat-value under" style="font-size:18px;">${bestRound !== null ? bestRound : 'No Rated Rounds'}</span>
             </div>
             <div class="history-stat">
               <span class="history-stat-label">Worst Round</span>
-              <span class="history-stat-value over" style="font-size:18px;">${worstRound !== null ? worstRound : '—'}</span>
+              <span class="history-stat-value over" style="font-size:18px;">${worstRound !== null ? worstRound : 'No Rated Rounds'}</span>
             </div>
           </div>
         </div>`;
@@ -2068,11 +2068,11 @@ function renderHistoryContent(playerName, days) {
       day.players.some(p => stripDiscTag(p.name) === playerName || p.name === playerName)
     );
   if (played.length === 0) {
-    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">No post-reset data for this player<br>in the last ${days} days</div>`;
+    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">No data for this player<br>in the last ${days} days</div>`;
     return;
   }
-  if (played.length < 3) {
-    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">3 day minimum required</span></div>`;
+  if (played.length < 2) {
+    el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Not enough data<br><br><span style="font-size:11px;opacity:0.6">${played.length} of ${days} days played</span><br><span style="font-size:11px;opacity:0.6">2 day minimum required</span></div>`;
     return;
   }
 
@@ -2098,7 +2098,7 @@ function renderHistoryContent(playerName, days) {
 
   // ── Best/worst ─────────────────────────────────────────────────────
   // `played` is already filtered to post-cutoff data, so use it directly.
-  const bestWorstUnlocked = played.length >= 3;
+  const bestWorstUnlocked = played.length >= 2;
 
   let bestWorstRowHtml = '';
   if (bestWorstUnlocked) {
