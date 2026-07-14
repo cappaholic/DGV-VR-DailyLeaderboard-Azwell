@@ -21,11 +21,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ── Constants (must match index.html exactly) ─────────────────────────────────
-RATING_PTS                 = 8.0    # pts/stroke — calibrated against the all-time top 175
-                                     # PDGA "Event Ratings" (avg round rating per tournament).
-                                     # Lands DGV VR's most dominant players (~1064-1066) at the
-                                     # median of that list (1066.5); best individual rounds stay
-                                     # under the single best event rating ever recorded (1088).
+RATING_PTS                 = 7.42   # pts/stroke — derived from a linear regression on 606
+                                     # real rounds across two current DGPT Elite Series events
+                                     # (Ale Open: 7.18 pts/stroke, R²=0.96; Heinola Open: 7.67
+                                     # pts/stroke, R²=0.9995). This is the actual, empirically
+                                     # observed PDGA rate of points awarded per stroke — not an
+                                     # assumed or fixed value. No anchor point is fixed either;
+                                     # SSA is computed fresh each day from propagator scores,
+                                     # exactly like real PDGA computes SSA fresh per round.
 RATING_PROPAGATOR_MIN_DAYS = 8      # min rounds to be a propagator (PDGA standard)
 RATING_MIN_PROPAGATORS     = 3      # min propagators needed to compute SSA
 RATING_MIN_ROUNDS          = 3      # min rounds before a rating is calculated at all
@@ -191,7 +194,7 @@ def main():
             "generated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "generated_ts": datetime.now(timezone.utc).isoformat(),
             "cutoff_date":  DATA_CUTOFF_DATE,
-            "method":       "SSA-anchored, 8.0pts/stroke — no par anchor (true PDGA method)",
+            "method":       "SSA-anchored, 7.42pts/stroke — no par anchor (true PDGA method)",
             "propagators":  0,
             "players":      {},
         }
@@ -267,7 +270,7 @@ def main():
         "generated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "generated_ts": datetime.now(timezone.utc).isoformat(),
         "cutoff_date":  DATA_CUTOFF_DATE,
-        "method":       "SSA-anchored, 8.0pts/stroke — no par anchor (true PDGA method)",
+        "method":       "SSA-anchored, 7.42pts/stroke — no par anchor (true PDGA method)",
         "window_days":  RATING_WINDOW_DAYS,
         "propagators":  len(propagators),
         "players":      players_sorted,
