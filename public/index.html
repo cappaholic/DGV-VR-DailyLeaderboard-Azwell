@@ -1324,7 +1324,10 @@ function toggleYesterdayLeaderboard() {
   } else {
     if (!yesterdaySnapshot) return;
     viewingYesterday = true;
-    renderSnapshotLeaderboard(yesterdaySnapshot);
+    // Ensure history data (and dgvDailySSA, populated as a side effect) is
+    // loaded before rendering — otherwise every Round Rating shows N/A on
+    // a fresh page load where no player modal has been opened yet.
+    loadHistoryData().then(() => renderSnapshotLeaderboard(yesterdaySnapshot));
     document.getElementById('yesterdayBanner').style.display = '';
     document.getElementById('lbHeader').classList.add('yesterday-cols');
     document.getElementById('roundRatingHeader').style.display = '';
