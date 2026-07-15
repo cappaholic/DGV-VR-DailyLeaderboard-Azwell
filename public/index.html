@@ -374,9 +374,9 @@
       justify-content: space-between;
       align-items: baseline;
       width: 100%;
-      margin-top: 6px;
+      margin-top: 5px;
       font-family: 'DM Mono', monospace;
-      font-size: 9px; letter-spacing: 1px;
+      font-size: 11px; letter-spacing: 0.5px;
       color: var(--muted); text-transform: uppercase;
       flex-shrink: 0;
     }
@@ -2603,7 +2603,7 @@ function startSidePanels(layout) {
 
   const titleHtml = `
     <div class="side-title-box">
-      <div class="side-title-text">${line1}<br><br>${line2}</div>
+      <div class="side-title-text"><span style="display:block;margin-bottom:14px;">${line1}</span><span style="display:block;">${line2}</span></div>
     </div>`;
 
   // Left panel: title box in section 0, hole photos 1-4 in sections 1-4
