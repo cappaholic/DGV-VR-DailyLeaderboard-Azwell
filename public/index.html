@@ -836,7 +836,7 @@
       100%      { transform: translateX(0); }
     }
     .player-name-wrap .player-name.marquee {
-      animation: marquee-scroll 5s ease-in-out infinite;
+      animation: marquee-scroll 8s ease-in-out infinite;
       will-change: transform;
     }
   }
@@ -2822,14 +2822,12 @@ function applyMarquee() {
 }
 
 // Run after leaderboard renders (small delay for layout paint)
-const _origRenderLb = typeof renderLeaderboard === 'function' ? renderLeaderboard : null;
 function scheduleMarquee() { setTimeout(applyMarquee, 300); }
-// Hook into MutationObserver on the leaderboard containers
-['leaderboardBody', 'yesterdayBody'].forEach(id => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  new MutationObserver(scheduleMarquee).observe(el, { childList: true, subtree: true });
-});
+// Hook into MutationObserver on the actual shared rows container
+{
+  const el = document.getElementById('lbRows');
+  if (el) new MutationObserver(scheduleMarquee).observe(el, { childList: true, subtree: true });
+}
 window.addEventListener('resize', applyMarquee);
 </script>
   <!-- ── Top 50 DGV VR Ratings modal ── -->
