@@ -1118,7 +1118,7 @@
         <span>Player</span>
         <span style="text-align:right; white-space:nowrap; display:block;" id="vsParHeader">VS Par</span>
         <span style="text-align:right">Strokes</span>
-        <span style="text-align:right; white-space:nowrap; display:none;" id="roundRatingHeader">Round Rating</span>
+        <span style="text-align:right; white-space:nowrap; display:none;" id="roundRatingHeader">Rating</span>
       </div>
       <div id="lbRows"></div>
       </div>
@@ -1423,6 +1423,23 @@ async function refreshLeaderboardOnly() {
   if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
 
   try {
+    // Check whether the daily seed has changed (i.e. the game has reset
+    // to a new day) since we last built the layout. Only rebuild the
+    // layout/hole photos if it has — this keeps the quick refresh fast
+    // and avoids needless photo re-loading when nothing has changed.
+    try {
+      const currentSeed = await fetchDailySeed(accessToken);
+      if (currentSeed !== todaySeed) {
+        const layout = generateLayout(currentSeed);
+        renderLayout(currentSeed, layout);
+        seededPar   = layout.totalPar;
+        todaySeed   = currentSeed;
+        todayLayout = layout;
+      }
+    } catch (seedErr) {
+      console.warn('Seed check failed during refresh:', seedErr.message);
+    }
+
     const first = await fetchScoresPage(accessToken, 0, 100);
     totalScores = first.total || (first.results || []).length;
     const pages = [first.results || []];
