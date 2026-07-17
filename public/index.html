@@ -855,14 +855,18 @@
   /* Portrait-only: move cheater stamp above name instead of overlaying the row */
   @media (max-width: 600px) and (orientation: portrait) {
     /* Give VS Par a little more room, add real spacing between columns, and
-       tighten letter-spacing so header labels can't run into each other */
+       tighten the header text so labels can't run into each other */
     .lb-header.yesterday-cols, .lb-row.yesterday-cols {
-      grid-template-columns: 48px 1fr 74px 52px 68px;
-      column-gap: 6px;
+      grid-template-columns: 48px 1fr 74px 46px 68px;
+      column-gap: 8px;
     }
     .lb-header.yesterday-cols span {
-      letter-spacing: 0.5px;
+      letter-spacing: 0;
+      font-size: 8px;
     }
+    /* Use the short "Strk" label instead of "Strokes" so it always fits */
+    .lb-header.yesterday-cols .strokes-full { display: none; }
+    .lb-header.yesterday-cols .strokes-short { display: inline; }
     /* Keep the grid intact — just reposition stamp above the player name, left-aligned */
     .lb-row.cheater .cheater-stamp {
       position: absolute;
@@ -1128,7 +1132,7 @@
         <span>Rank</span>
         <span>Player</span>
         <span style="text-align:right; white-space:nowrap; display:block;" id="vsParHeader">VS Par</span>
-        <span style="text-align:right">Strokes</span>
+        <span style="text-align:right"><span class="strokes-full">Strokes</span><span class="strokes-short" style="display:none;">Strk</span></span>
         <span style="text-align:right; white-space:nowrap; display:none;" id="roundRatingHeader"><span class="rr-round-word">Round </span>Rating</span>
       </div>
       <div id="lbRows"></div>
