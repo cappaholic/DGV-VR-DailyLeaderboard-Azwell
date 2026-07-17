@@ -852,6 +852,10 @@
 
   /* Portrait-only: move cheater stamp above name instead of overlaying the row */
   @media (max-width: 600px) and (orientation: portrait) {
+    /* Give VS Par a little more room so it doesn't crowd into Strokes */
+    .lb-header.yesterday-cols, .lb-row.yesterday-cols {
+      grid-template-columns: 48px 1fr 74px 52px 68px;
+    }
     /* Keep the grid intact — just reposition stamp above the player name, left-aligned */
     .lb-row.cheater .cheater-stamp {
       position: absolute;
