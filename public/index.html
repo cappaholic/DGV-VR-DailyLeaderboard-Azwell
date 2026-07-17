@@ -848,13 +848,20 @@
     .lb-row .score-cell { justify-content: flex-end; }
     /* Tighten sub-labels in yesterday mode so columns don't bleed */
     .lb-row.yesterday-cols .score-raw { font-size: 8px; letter-spacing: 0; }
+    /* Mobile header stays short: "Rating" only, not "Round Rating" */
+    .rr-round-word { display: none; }
   }
 
   /* Portrait-only: move cheater stamp above name instead of overlaying the row */
   @media (max-width: 600px) and (orientation: portrait) {
-    /* Give VS Par a little more room so it doesn't crowd into Strokes */
+    /* Give VS Par a little more room, add real spacing between columns, and
+       tighten letter-spacing so header labels can't run into each other */
     .lb-header.yesterday-cols, .lb-row.yesterday-cols {
       grid-template-columns: 48px 1fr 74px 52px 68px;
+      column-gap: 6px;
+    }
+    .lb-header.yesterday-cols span {
+      letter-spacing: 0.5px;
     }
     /* Keep the grid intact — just reposition stamp above the player name, left-aligned */
     .lb-row.cheater .cheater-stamp {
@@ -1122,7 +1129,7 @@
         <span>Player</span>
         <span style="text-align:right; white-space:nowrap; display:block;" id="vsParHeader">VS Par</span>
         <span style="text-align:right">Strokes</span>
-        <span style="text-align:right; white-space:nowrap; display:none;" id="roundRatingHeader">Rating</span>
+        <span style="text-align:right; white-space:nowrap; display:none;" id="roundRatingHeader"><span class="rr-round-word">Round </span>Rating</span>
       </div>
       <div id="lbRows"></div>
       </div>
