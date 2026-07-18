@@ -836,7 +836,7 @@
       100%      { transform: translateX(0); }
     }
     .player-name-wrap .player-name.marquee {
-      animation: marquee-scroll 8s ease-in-out infinite;
+      animation: marquee-scroll 12s ease-in-out infinite;
       will-change: transform;
     }
   }
@@ -1473,6 +1473,15 @@ async function refreshLeaderboardOnly() {
       renderLeaderboard();
       document.getElementById('leaderboardSection').style.display = 'block';
       document.getElementById('emptyState').style.display = 'none';
+    } else {
+      // No scores yet for the (possibly new) day — clear stale rows
+      // instead of silently leaving yesterday's leaderboard on screen.
+      document.getElementById('lbRows').innerHTML = '';
+      document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyStateMsg').textContent = 'No scores yet — check back soon!';
+      document.getElementById('leaderboardSection').style.display = 'block';
+      updateYesterdayBtn();
     }
   } catch (err) {
     console.error('Refresh failed:', err);
