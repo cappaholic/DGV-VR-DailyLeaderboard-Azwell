@@ -1448,6 +1448,10 @@ async function refreshLeaderboardOnly() {
         seededPar   = layout.totalPar;
         todaySeed   = currentSeed;
         todayLayout = layout;
+        // The daily reset also means yesterday.json now points to a new
+        // day — re-fetch it so the "Yesterday's Leaderboard" button shows
+        // the day that just ended, not the one before it.
+        loadYesterdaySnapshot();
       }
     } catch (seedErr) {
       console.warn('Seed check failed during refresh:', seedErr.message);
