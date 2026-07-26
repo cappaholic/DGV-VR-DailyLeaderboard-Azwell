@@ -73,41 +73,53 @@ RATING_WINDOW_DAYS         = 30     # primary rolling window (scaled down from P
 RATING_WINDOW_FALLBACK     = 60     # fallback if < 8 rounds in primary window
 RATING_WINDOW_MIN_ROUNDS   = 8      # threshold that triggers fallback
 
-# ── Points-per-stroke compression curve ───────────────────────────────────────
-# PDGA's own approximate reference points, on an 18-hole scale (typical total
-# par ~54): SSA ~44 -> ~13 pts/throw, SSA ~48-53 (mid ~50.5) -> ~10 pts/throw,
-# SSA ~68 -> ~6 pts/throw. Scaled down to our own average post-cutoff total
-# par (see PAR_SCALE_FACTOR, computed from real history.json data) since our
-# 9-hole format plays at a much lower total par than PDGA's 18-hole rounds.
-PDGA_REFERENCE_PAR    = 54.0
-OUR_AVERAGE_PAR       = 31.09   # average total par across post-cutoff history.json
-PAR_SCALE_FACTOR      = OUR_AVERAGE_PAR / PDGA_REFERENCE_PAR
+# ── Points-per-stroke compression curve (v3 — linear, data-derived) ──────────
+# Derived from two REAL PDGA regression fits (not approximate blog numbers):
+#   Echo Valley Open (B-Tier, moderate course): 7.33 pts/stroke, R²=0.9996
+#   Big Easy Open (known hard course):          4.00 pts/stroke, R²=1.0
+# These converge with the original 606-round baseline (7.42 pts/stroke) at
+# the "moderate" end, giving strong confidence in ~7.4 as the typical value.
+#
+# The real measured relationship between difficulty (18-hole SSA) and
+# pts/stroke is -0.2218 pts per SSA-stroke. Since our 9-hole format uses a
+# much lower total par, this rate is scaled up by 1/PAR_SCALE_FACTOR before
+# being applied to our own SSA scale (a DGV stroke represents a larger share
+# of the whole round than an 18-hole stroke does).
+#
+# The curve is centered on DGV VR's own observed mean SSA — not a PDGA
+# absolute SSA value, since DGV's actual scoring runs well below par
+# relative to how PDGA's SSA relates to par, so absolute PDGA SSA values
+# don't translate directly onto our scale. Clamped to [4.0, 13.0]: the
+# floor is a confirmed real value (Big Easy Open); the ceiling is a
+# conservative, still-unconfirmed safety cap that this gentler real slope
+# essentially never reaches across the actually-observed SSA range.
+#
+# NOTE (future refinement, not yet implemented): hole composition (count of
+# par-4/5 vs par-3 holes) shows a real but modest correlation (r≈0.3, ~9%
+# of variance) with score spread, independent of SSA. Worth revisiting as
+# a secondary input once more historical data accumulates (currently only
+# 23 days) — not built in now to avoid overfitting a 2-variable model to
+# a small sample.
+PDGA_REFERENCE_PAR     = 54.0
+OUR_AVERAGE_PAR        = 31.09   # average total par across post-cutoff history.json
+PAR_SCALE_FACTOR       = OUR_AVERAGE_PAR / PDGA_REFERENCE_PAR
 
-COMPRESSION_ANCHORS = [
-    # (ssa scaled to our par, pts per stroke)
-    (44.0  * PAR_SCALE_FACTOR, 13.0),   # easy day
-    (50.5  * PAR_SCALE_FACTOR, 10.0),   # typical day
-    (68.0  * PAR_SCALE_FACTOR, 6.0),    # hard day
-]
+DGV_MEAN_SSA           = 26.28   # DGV VR's own observed mean daily SSA (measured)
+COMPRESSION_CENTER_PTS = 7.4     # pts/stroke at DGV_MEAN_SSA (avg of Echo Valley's
+                                  # 7.33 and the original 606-round baseline's 7.42)
+COMPRESSION_SLOPE      = -0.2218 / PAR_SCALE_FACTOR  # real measured rate, rescaled
+COMPRESSION_FLOOR      = 4.0     # confirmed real value (Big Easy Open)
+COMPRESSION_CEILING    = 13.0    # conservative estimate, rarely reached
 
 
 def pts_per_stroke(ssa: float) -> float:
     """
-    Interpolate points-per-stroke from the scaled PDGA reference anchors.
-    Clamped to the 6-13 range outside the anchor points (matches PDGA's own
-    documented range) instead of extrapolating further on freak days.
+    Linear compression model derived from real PDGA regression data (Echo
+    Valley Open + Big Easy Open), centered on DGV VR's own observed mean
+    SSA rather than PDGA's absolute SSA scale.
     """
-    (ssa_lo, pts_lo), (ssa_mid, pts_mid), (ssa_hi, pts_hi) = COMPRESSION_ANCHORS
-
-    if ssa <= ssa_lo:
-        return pts_lo
-    if ssa <= ssa_mid:
-        frac = (ssa - ssa_lo) / (ssa_mid - ssa_lo)
-        return pts_lo + frac * (pts_mid - pts_lo)
-    if ssa <= ssa_hi:
-        frac = (ssa - ssa_mid) / (ssa_hi - ssa_mid)
-        return pts_mid + frac * (pts_hi - pts_mid)
-    return pts_hi
+    raw = COMPRESSION_CENTER_PTS + COMPRESSION_SLOPE * (ssa - DGV_MEAN_SSA)
+    return max(COMPRESSION_FLOOR, min(COMPRESSION_CEILING, raw))
 
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
