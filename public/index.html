@@ -2457,31 +2457,48 @@ const RATING_WINDOW_DAYS           = 30;   // primary rolling window (scaled dow
 const RATING_WINDOW_FALLBACK       = 60;   // fallback if < 8 rounds in primary window
 const RATING_WINDOW_MIN_ROUNDS     = 8;    // threshold that triggers fallback
 
-// Points-per-stroke compression curve — same reference points and same
-// par-scaling as calculate_ratings.py. Must use the identical hardcoded
-// PAR_SCALE_FACTOR (not recomputed client-side) so client and server
-// ratings always agree exactly.
-const PDGA_REFERENCE_PAR = 54.0;
-const OUR_AVERAGE_PAR    = 31.09; // average total par across post-cutoff history.json
-const PAR_SCALE_FACTOR   = OUR_AVERAGE_PAR / PDGA_REFERENCE_PAR;
-const COMPRESSION_ANCHORS = [
-  [44.0  * PAR_SCALE_FACTOR, 13.0],  // easy day
-  [50.5  * PAR_SCALE_FACTOR, 10.0],  // typical day
-  [68.0  * PAR_SCALE_FACTOR, 6.0],   // hard day
-];
+// Points-per-stroke compression curve (v3 — linear, data-derived).
+// Derived from two REAL PDGA regression fits (not approximate blog
+// numbers): Echo Valley Open (moderate course, 7.33 pts/stroke,
+// R²=0.9996) and Big Easy Open (known hard course, 4.00 pts/stroke,
+// R²=1.0). These converge with the original 606-round baseline (7.42
+// pts/stroke) at the "moderate" end, giving strong confidence in ~7.4
+// as the typical value.
+//
+// The real measured relationship between difficulty (18-hole SSA) and
+// pts/stroke is -0.2218 pts per SSA-stroke, scaled up by 1/PAR_SCALE_FACTOR
+// since a DGV stroke represents a larger share of our much lower-par
+// 9-hole round than an 18-hole stroke does.
+//
+// Centered on DGV VR's own observed mean SSA (not a PDGA absolute value —
+// DGV's scoring runs well below par relative to how PDGA's SSA relates to
+// par, so absolute PDGA SSA doesn't translate directly onto our scale).
+// Clamped to [4.0, 13.0]: floor is a confirmed real value (Big Easy Open);
+// ceiling is a conservative, unconfirmed safety cap the gentler real slope
+// essentially never reaches across our actually-observed SSA range.
+//
+// Must use IDENTICAL hardcoded constants to calculate_ratings.py (not
+// recomputed client-side) so client and server ratings always agree.
+//
+// NOTE (future refinement, not yet implemented): hole composition (count
+// of par-4/5 vs par-3 holes) shows a real but modest correlation (r≈0.3,
+// ~9% of variance) with score spread, independent of SSA. Worth revisiting
+// once more historical data accumulates — not built in now to avoid
+// overfitting a 2-variable model to a small sample.
+const PDGA_REFERENCE_PAR     = 54.0;
+const OUR_AVERAGE_PAR        = 31.09;  // average total par across post-cutoff history.json
+const PAR_SCALE_FACTOR       = OUR_AVERAGE_PAR / PDGA_REFERENCE_PAR;
+
+const DGV_MEAN_SSA           = 26.28;  // DGV VR's own observed mean daily SSA (measured)
+const COMPRESSION_CENTER_PTS = 7.4;    // pts/stroke at DGV_MEAN_SSA (avg of Echo Valley's
+                                        // 7.33 and the original 606-round baseline's 7.42)
+const COMPRESSION_SLOPE      = -0.2218 / PAR_SCALE_FACTOR; // real measured rate, rescaled
+const COMPRESSION_FLOOR      = 4.0;    // confirmed real value (Big Easy Open)
+const COMPRESSION_CEILING    = 13.0;   // conservative estimate, rarely reached
 
 function ptsPerStroke(ssa) {
-  const [[ssaLo, ptsLo], [ssaMid, ptsMid], [ssaHi, ptsHi]] = COMPRESSION_ANCHORS;
-  if (ssa <= ssaLo) return ptsLo;
-  if (ssa <= ssaMid) {
-    const frac = (ssa - ssaLo) / (ssaMid - ssaLo);
-    return ptsLo + frac * (ptsMid - ptsLo);
-  }
-  if (ssa <= ssaHi) {
-    const frac = (ssa - ssaMid) / (ssaHi - ssaMid);
-    return ptsMid + frac * (ptsHi - ptsMid);
-  }
-  return ptsHi;
+  const raw = COMPRESSION_CENTER_PTS + COMPRESSION_SLOPE * (ssa - DGV_MEAN_SSA);
+  return Math.max(COMPRESSION_FLOOR, Math.min(COMPRESSION_CEILING, raw));
 }
 
 // Expose daily SSA so yesterday renderer can apply the correct value
@@ -2703,7 +2720,7 @@ function buildAllRatings(history) {
 // stored rating. (Currently unused/no callers — kept for potential future use.)
 function getTodayRoundRating(playerName, todayVsPar) {
   if (isFlagged(playerName)) return null;
-  const typicalPts = COMPRESSION_ANCHORS[1][1]; // "typical day" anchor, 10.0
+  const typicalPts = COMPRESSION_CENTER_PTS; // "typical day" value, 7.4
   return Math.round(1000 - todayVsPar * typicalPts);
 }
 
