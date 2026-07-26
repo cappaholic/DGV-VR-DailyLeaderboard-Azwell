@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DGV VR Rating Calculator — True PDGA SSA Method
+DGV VR Rating Calculator — True PDGA SSA Method (v2)
 Runs every Sunday night via GitHub Actions (Monday 00:30 UTC).
 Reads public/history.json and public/flagged.json,
 computes DGV VR Ratings for all non-flagged players,
@@ -8,12 +8,35 @@ writes public/ratings.json.
 
 Rating formula (true PDGA method, no par anchor):
   SSA = average raw score of propagators who played that day
-  Round Rating = 1000 + (SSA - playerScore) x RATING_PTS
+  Round Rating = 1000 + (SSA - playerScore) x pts_per_stroke(SSA)
   Player Rating = weighted rolling average of round ratings
 
-Rolling window (mirrors PDGA):
-  Primary:  90 days from player's most recent round
-  Fallback: 180 days if fewer than 8 rounds in primary window
+Rolling window (mirrors PDGA, scaled to our much shorter season):
+  Primary:  30 days from player's most recent round
+  Fallback: 60 days if fewer than 8 rounds in primary window
+
+Propagators (mirrors real PDGA definition):
+  8+ total rounds AND an established rating of 750+.
+  Since "established rating" requires ratings to already exist, this is
+  done as a two-pass calculation — identical in spirit to how PDGA uses
+  a player's rating from BEFORE the round in question, never a rating
+  computed circularly from the same data being rated:
+    Pass 1: provisional ratings for every player with 8+ rounds, no
+            rating floor yet, no per-propagator exclusion yet.
+    Pass 2: propagators = 8+ rounds AND Pass-1 rating >= 750. Daily SSA
+            is recomputed using this refined pool, this time applying
+            the 60-point-below-own-rating exclusion rule (using each
+            propagator's Pass-1 rating as their "established" rating).
+            Final player ratings are computed from this Pass-2 SSA.
+
+Points-per-stroke ("compression", mirrors real PDGA):
+  PDGA does not publish an exact formula for this — only approximate
+  reference points on 18-hole courses (~SSA 44/50.5/68 -> ~13/10/6
+  pts/throw). Since our format is 9 holes with a much lower total par,
+  those reference points are scaled proportionally to our own average
+  post-cutoff total par before being used as interpolation anchors.
+  This is a best-effort approximation of an unpublished system, not a
+  guaranteed match to PDGA's actual internal numbers.
 """
 
 import json, math, statistics
@@ -21,26 +44,71 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ── Constants (must match index.html exactly) ─────────────────────────────────
-RATING_PTS                 = 7.42   # pts/stroke — derived from a linear regression on 606
-                                     # real rounds across two current DGPT Elite Series events
-                                     # (Ale Open: 7.18 pts/stroke, R²=0.96; Heinola Open: 7.67
-                                     # pts/stroke, R²=0.9995). This is the actual, empirically
-                                     # observed PDGA rate of points awarded per stroke — not an
-                                     # assumed or fixed value. No anchor point is fixed either;
-                                     # SSA is computed fresh each day from propagator scores,
-                                     # exactly like real PDGA computes SSA fresh per round.
 RATING_PROPAGATOR_MIN_DAYS = 8      # min rounds to be a propagator (PDGA standard)
-RATING_MIN_PROPAGATORS     = 3      # min propagators needed to compute SSA
+RATING_PROPAGATOR_MIN_RATING = 750  # min established rating to be a propagator
+                                     # (real PDGA uses 700; raised slightly per
+                                     # Azwell's request since 700 currently
+                                     # includes nearly the entire player pool)
+PROPAGATOR_EXCLUSION_MARGIN = 60    # a propagator's round is excluded from that
+                                     # day's SSA if it's more than this many
+                                     # rating points below their own rating
+                                     # (matches PDGA's documented rule exactly)
+
+RATING_MIN_PROPAGATORS     = 2      # min propagators needed to compute SSA
+                                     # (matches PDGA's documented minimum)
 RATING_MIN_ROUNDS          = 3      # min rounds before a rating is calculated at all
+                                     # (kept as-is; PDGA's real minimum is 1 round,
+                                     # but this project intentionally keeps a
+                                     # higher bar given our much shorter season)
 RATING_PROVISIONAL_ROUNDS  = 7      # rounds_counted needed at a Sunday calculation to
                                      # permanently drop the "provisional" tag (also gates
                                      # Top-N leaderboard eligibility via the same flag)
 
 DATA_CUTOFF_DATE           = '2026-07-03'  # only post-cutoff data used in calculations
 
-RATING_WINDOW_DAYS         = 90     # primary rolling window
-RATING_WINDOW_FALLBACK     = 180    # fallback if < 8 rounds in primary window
+RATING_WINDOW_DAYS         = 30     # primary rolling window (scaled down from PDGA's
+                                     # 12-month window to fit our much shorter season —
+                                     # a touring pro plays ~20-30 PDGA events/year, so
+                                     # 30 days of DAILY play is a comparable rounds count)
+RATING_WINDOW_FALLBACK     = 60     # fallback if < 8 rounds in primary window
 RATING_WINDOW_MIN_ROUNDS   = 8      # threshold that triggers fallback
+
+# ── Points-per-stroke compression curve ───────────────────────────────────────
+# PDGA's own approximate reference points, on an 18-hole scale (typical total
+# par ~54): SSA ~44 -> ~13 pts/throw, SSA ~48-53 (mid ~50.5) -> ~10 pts/throw,
+# SSA ~68 -> ~6 pts/throw. Scaled down to our own average post-cutoff total
+# par (see PAR_SCALE_FACTOR, computed from real history.json data) since our
+# 9-hole format plays at a much lower total par than PDGA's 18-hole rounds.
+PDGA_REFERENCE_PAR    = 54.0
+OUR_AVERAGE_PAR       = 31.09   # average total par across post-cutoff history.json
+PAR_SCALE_FACTOR      = OUR_AVERAGE_PAR / PDGA_REFERENCE_PAR
+
+COMPRESSION_ANCHORS = [
+    # (ssa scaled to our par, pts per stroke)
+    (44.0  * PAR_SCALE_FACTOR, 13.0),   # easy day
+    (50.5  * PAR_SCALE_FACTOR, 10.0),   # typical day
+    (68.0  * PAR_SCALE_FACTOR, 6.0),    # hard day
+]
+
+
+def pts_per_stroke(ssa: float) -> float:
+    """
+    Interpolate points-per-stroke from the scaled PDGA reference anchors.
+    Clamped to the 6-13 range outside the anchor points (matches PDGA's own
+    documented range) instead of extrapolating further on freak days.
+    """
+    (ssa_lo, pts_lo), (ssa_mid, pts_mid), (ssa_hi, pts_hi) = COMPRESSION_ANCHORS
+
+    if ssa <= ssa_lo:
+        return pts_lo
+    if ssa <= ssa_mid:
+        frac = (ssa - ssa_lo) / (ssa_mid - ssa_lo)
+        return pts_lo + frac * (pts_mid - pts_lo)
+    if ssa <= ssa_hi:
+        frac = (ssa - ssa_mid) / (ssa_hi - ssa_mid)
+        return pts_mid + frac * (pts_hi - pts_mid)
+    return pts_hi
+
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 PUBLIC_DIR   = Path(__file__).parent / "public"
@@ -62,10 +130,13 @@ def is_flagged(name: str, flagged: set) -> bool:
     return name.lower() in flagged
 
 
-def build_propagators(full_history: list, flagged: set) -> dict:
+def build_propagator_pool(full_history: list, flagged: set) -> dict:
     """
-    Career average RAW SCORE per propagator, using FULL history (pre+post cutoff).
-    This maximises the propagator pool. Par is never used.
+    Candidate propagators = 8+ total rounds (full history, pre+post cutoff),
+    same as before. The rating-floor filter is applied separately in Pass 2,
+    since it requires ratings that don't exist yet on the first pass.
+    Career average RAW SCORE per candidate, for reference/logging only —
+    actual SSA still comes from real per-day scores, never this average.
     """
     totals, counts = {}, {}
     for day in full_history:
@@ -82,19 +153,18 @@ def build_propagators(full_history: list, flagged: set) -> dict:
     }
 
 
-def build_daily_ssa(history: list, propagators: dict, flagged: set) -> dict:
+def build_daily_ssa_simple(history: list, propagators: dict, flagged: set) -> dict:
     """
-    SSA for each day = average raw score of propagators who played that day.
-    Uses post-cutoff history only for actual scores.
-    Fallback: trimmed mean of best 60% of scores when propagators are insufficient.
-    Par is never used.
+    Pass 1 SSA: average raw score of candidate propagators who played that
+    day. No per-propagator exclusion yet (no established ratings exist to
+    compare against on this pass). Compression is still applied since it
+    only depends on that day's own SSA, not on any player's rating.
     """
     ssa = {}
     for day in history:
         props = [p for p in day['players']
                  if not is_flagged(p['name'], flagged) and p['name'] in propagators]
         if len(props) < RATING_MIN_PROPAGATORS:
-            # Fallback: trimmed mean — best 60% of scores, robust against outliers
             scores = sorted(p['score'] for p in day['players'])
             trim_n = max(1, int(len(scores) * 0.60))
             trimmed = scores[:trim_n]
@@ -104,8 +174,59 @@ def build_daily_ssa(history: list, propagators: dict, flagged: set) -> dict:
     return ssa
 
 
+def build_daily_ssa_final(history: list, propagators: set, prelim_ratings: dict,
+                           flagged: set) -> dict:
+    """
+    Pass 2 SSA: uses the refined propagator pool (8+ rounds AND Pass-1
+    rating >= RATING_PROPAGATOR_MIN_RATING). For each day:
+      1. Compute a preliminary SSA from all qualifying propagators who
+         played that day.
+      2. Using that preliminary SSA's own compression rate, compute each
+         propagator's implied round rating for their score that day.
+      3. Exclude any propagator whose implied round rating is more than
+         PROPAGATOR_EXCLUSION_MARGIN points below their OWN Pass-1 rating
+         (matches PDGA's documented "60 points below their rating" rule).
+      4. Recompute the final SSA from the remaining, non-excluded scores.
+    Falls back to the trimmed-mean method if too few propagators remain
+    at any stage (same fallback used elsewhere in this file).
+    """
+    ssa = {}
+    for day in history:
+        day_props = [p for p in day['players']
+                     if not is_flagged(p['name'], flagged) and p['name'] in propagators]
+
+        if len(day_props) < RATING_MIN_PROPAGATORS:
+            scores = sorted(p['score'] for p in day['players'])
+            trim_n = max(1, int(len(scores) * 0.60))
+            trimmed = scores[:trim_n]
+            ssa[day['date']] = sum(trimmed) / len(trimmed) if trimmed else None
+            continue
+
+        prelim_ssa = sum(p['score'] for p in day_props) / len(day_props)
+        prelim_pts = pts_per_stroke(prelim_ssa)
+
+        kept = []
+        for p in day_props:
+            implied_rr = 1000 + (prelim_ssa - p['score']) * prelim_pts
+            own_rating = prelim_ratings.get(p['name'])
+            if own_rating is not None and implied_rr < (own_rating - PROPAGATOR_EXCLUSION_MARGIN):
+                continue  # excluded — round was a big outlier vs their own rating
+            kept.append(p)
+
+        if len(kept) < RATING_MIN_PROPAGATORS:
+            # Exclusion left too few propagators — fall back to trimmed mean
+            scores = sorted(p['score'] for p in day['players'])
+            trim_n = max(1, int(len(scores) * 0.60))
+            trimmed = scores[:trim_n]
+            ssa[day['date']] = sum(trimmed) / len(trimmed) if trimmed else None
+        else:
+            ssa[day['date']] = sum(p['score'] for p in kept) / len(kept)
+
+    return ssa
+
+
 def compute_round_rating(player_score: float, ssa: float) -> float:
-    return 1000 + (ssa - player_score) * RATING_PTS
+    return 1000 + (ssa - player_score) * pts_per_stroke(ssa)
 
 
 def apply_window(rounds: list) -> tuple:
@@ -153,62 +274,13 @@ def compute_rolling_rating(round_ratings: list) -> float | None:
     return w_avg
 
 
-def load_previously_graduated(path: Path) -> set:
+def compute_all_ratings(history: list, daily_ssa: dict, flagged: set) -> dict:
     """
-    Players who were already non-provisional in the last ratings.json run.
-    Once a Sunday calculation finds a player with 7+ rounds_counted, they
-    stay non-provisional permanently — even if a later week's rolling
-    window happens to contain fewer than 7 rounds (e.g. an inactive
-    stretch). This reads the ratings.json this run is about to overwrite,
-    so "graduated" status persists across every future weekly calculation.
-
-    Example: a player with 6 rounds at one Sunday's calculation stays
-    provisional. If they play 1+ more round before the next Sunday
-    (reaching 7+ counted rounds), that next calculation drops the tag
-    permanently.
+    Shared final step for both passes: given a day->SSA map, compute every
+    player's round ratings, apply the rolling window, and return final
+    player ratings. Used for both the Pass-1 (preliminary) and Pass-2
+    (final) calculations so the two passes stay logically identical.
     """
-    try:
-        data = json.loads(path.read_text())
-        players = data.get('players', {})
-        return {name for name, d in players.items() if not d.get('provisional', True)}
-    except Exception:
-        return set()
-
-
-def main():
-    print(f"[{datetime.now(timezone.utc).isoformat()}] DGV VR Rating Calculator starting...")
-
-    history_all      = json.loads(HISTORY_FILE.read_text())
-    flagged          = load_flagged(FLAGGED_FILE)
-    graduated        = load_previously_graduated(RATINGS_FILE)
-    print(f"  History days (total):           {len(history_all)}")
-    print(f"  Flagged players:                {len(flagged)}")
-    print(f"  Previously graduated players:   {len(graduated)}")
-
-    # Apply data cutoff
-    history = [d for d in history_all if d['date'] >= DATA_CUTOFF_DATE]
-    print(f"  History days (post-cutoff):     {len(history)}")
-
-    if not history:
-        output = {
-            "generated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "generated_ts": datetime.now(timezone.utc).isoformat(),
-            "cutoff_date":  DATA_CUTOFF_DATE,
-            "method":       "SSA-anchored, 7.42pts/stroke — no par anchor (true PDGA method)",
-            "propagators":  0,
-            "players":      {},
-        }
-        RATINGS_FILE.write_text(json.dumps(output, separators=(",", ":")))
-        print("  No post-cutoff data yet — empty ratings.json written.")
-        return
-
-    # Propagators from FULL history, daily SSA from post-cutoff only
-    propagators = build_propagators(history_all, flagged)
-    daily_ssa   = build_daily_ssa(history, propagators, flagged)
-    print(f"  Propagators (8+ rounds):        {len(propagators)}")
-    print(f"  Days with SSA computed:         {sum(1 for v in daily_ssa.values() if v is not None)}")
-
-    # Collect per-player round ratings (post-cutoff only)
     player_rounds: dict[str, list] = {}
     for day in history:
         ssa = daily_ssa.get(day['date'])
@@ -219,9 +291,7 @@ def main():
             if is_flagged(name, flagged):
                 continue
             rr = compute_round_rating(p['score'], ssa)
-            if name not in player_rounds:
-                player_rounds[name] = []
-            player_rounds[name].append({
+            player_rounds.setdefault(name, []).append({
                 "date":        day['date'],
                 "score":       p['score'],
                 "vsPar":       p['vsPar'],
@@ -229,31 +299,15 @@ def main():
                 "roundRating": round(rr),
             })
 
-    # Compute player ratings using rolling window
-    players_out = {}
-    fallback_count = 0
-
+    ratings = {}
     for name, all_rounds in player_rounds.items():
         windowed, used_fallback = apply_window(all_rounds)
-        if used_fallback:
-            fallback_count += 1
-
         rr_vals = [r['roundRating'] for r in windowed]
         rating  = compute_rolling_rating(rr_vals)
         if rating is None:
             continue
-
-        # Provisional = fewer than RATING_PROVISIONAL_ROUNDS (7) counted rounds
-        # at this calculation. Once a player crosses that threshold at any
-        # Sunday run, they stay non-provisional permanently — even if a much
-        # later week's rolling window happens to dip back under 7 rounds.
-        is_provisional = len(windowed) < RATING_PROVISIONAL_ROUNDS
-        if name in graduated:
-            is_provisional = False
-
-        players_out[name] = {
+        ratings[name] = {
             "rating":         round(rating),
-            "provisional":    is_provisional,
             "rounds_counted": len(windowed),
             "total_rounds":   len(all_rounds),
             "used_fallback":  used_fallback,
@@ -261,19 +315,91 @@ def main():
             "worst_round":    min(rr_vals),
             "last_played":    all_rounds[-1]['date'],
         }
+    return ratings
+
+
+def load_previously_graduated(path: Path) -> set:
+    """
+    Players who were already non-provisional in the last ratings.json run.
+    Once a Sunday calculation finds a player with 7+ rounds_counted, they
+    stay non-provisional permanently — even if a later week's rolling
+    window happens to contain fewer than 7 rounds (e.g. an inactive
+    stretch). This reads the ratings.json this run is about to overwrite,
+    so "graduated" status persists across every future weekly calculation.
+    """
+    try:
+        data = json.loads(path.read_text())
+        players = data.get('players', {})
+        return {name for name, d in players.items() if not d.get('provisional', True)}
+    except Exception:
+        return set()
+
+
+def main():
+    print(f"[{datetime.now(timezone.utc).isoformat()}] DGV VR Rating Calculator (v2) starting...")
+
+    history_all      = json.loads(HISTORY_FILE.read_text())
+    flagged          = load_flagged(FLAGGED_FILE)
+    graduated        = load_previously_graduated(RATINGS_FILE)
+    print(f"  History days (total):           {len(history_all)}")
+    print(f"  Flagged players:                {len(flagged)}")
+    print(f"  Previously graduated players:   {len(graduated)}")
+
+    history = [d for d in history_all if d['date'] >= DATA_CUTOFF_DATE]
+    print(f"  History days (post-cutoff):     {len(history)}")
+
+    if not history:
+        output = {
+            "generated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "generated_ts": datetime.now(timezone.utc).isoformat(),
+            "cutoff_date":  DATA_CUTOFF_DATE,
+            "method":       "SSA-anchored, PDGA-style compression — no par anchor",
+            "propagators":  0,
+            "players":      {},
+        }
+        RATINGS_FILE.write_text(json.dumps(output, separators=(",", ":")))
+        print("  No post-cutoff data yet — empty ratings.json written.")
+        return
+
+    # ── Pass 1: preliminary ratings, no rating floor on propagators yet ──────
+    candidate_pool  = build_propagator_pool(history_all, flagged)
+    prelim_ssa      = build_daily_ssa_simple(history, candidate_pool, flagged)
+    prelim_ratings_full = compute_all_ratings(history, prelim_ssa, flagged)
+    prelim_ratings  = {name: d["rating"] for name, d in prelim_ratings_full.items()}
+
+    print(f"  Pass 1 — candidate propagators (8+ rounds): {len(candidate_pool)}")
+
+    # ── Pass 2: refine propagator pool to 8+ rounds AND 750+ rating ──────────
+    final_propagators = {
+        name for name in candidate_pool
+        if prelim_ratings.get(name, 0) >= RATING_PROPAGATOR_MIN_RATING
+    }
+    print(f"  Pass 2 — final propagators (8+ rounds, {RATING_PROPAGATOR_MIN_RATING}+ rating): {len(final_propagators)}")
+
+    final_ssa = build_daily_ssa_final(history, final_propagators, prelim_ratings, flagged)
+    print(f"  Days with final SSA computed:   {sum(1 for v in final_ssa.values() if v is not None)}")
+
+    players_out = compute_all_ratings(history, final_ssa, flagged)
+    fallback_count = sum(1 for d in players_out.values() if d["used_fallback"])
+
+    for name, d in players_out.items():
+        is_provisional = d["rounds_counted"] < RATING_PROVISIONAL_ROUNDS
+        if name in graduated:
+            is_provisional = False
+        d["provisional"] = is_provisional
 
     players_sorted = dict(
         sorted(players_out.items(), key=lambda x: x[1]['rating'], reverse=True)
     )
 
     output = {
-        "generated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "generated_ts": datetime.now(timezone.utc).isoformat(),
-        "cutoff_date":  DATA_CUTOFF_DATE,
-        "method":       "SSA-anchored, 7.42pts/stroke — no par anchor (true PDGA method)",
-        "window_days":  RATING_WINDOW_DAYS,
-        "propagators":  len(propagators),
-        "players":      players_sorted,
+        "generated":      datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "generated_ts":   datetime.now(timezone.utc).isoformat(),
+        "cutoff_date":    DATA_CUTOFF_DATE,
+        "method":         "SSA-anchored, PDGA-style compression — no par anchor",
+        "window_days":    RATING_WINDOW_DAYS,
+        "propagators":    len(final_propagators),
+        "players":        players_sorted,
     }
 
     RATINGS_FILE.write_text(json.dumps(output, separators=(",", ":")))
