@@ -1392,7 +1392,7 @@ function renderSnapshotLeaderboard(snap) {
     const _yDate  = new Date(_yUTC.getTime() - 86400000).toISOString().slice(0, 10);
     const yDate   = yesterdaySnapshot && yesterdaySnapshot.date ? yesterdaySnapshot.date : _yDate;
     const ySSA    = dgvDailySSA[yDate] !== undefined ? dgvDailySSA[yDate] : null;
-    const yRR     = (flagged || ySSA === null) ? null : Math.round(1000 + (ySSA - rawScore) * RATING_PTS);
+    const yRR     = (flagged || ySSA === null) ? null : Math.round(computeRoundRating(rawScore, ySSA));
     const yrDisplay = yRR !== null
       ? `<div class="score-vs-par" style="font-size:20px;color:var(--accent2);">${yRR}</div><div class="score-raw">round rating</div>`
       : `<div class="score-vs-par even" style="font-size:20px;color:var(--muted);">N/A</div><div class="score-raw">round rating</div>`;
@@ -2409,28 +2409,87 @@ function renderTop50List() {
   container.innerHTML = html;
 }
 //  True PDGA SSA method — no fixed anchor point. SSA is computed fresh
-//  each day from propagator scores (8+ rounds, full history), exactly
-//  like real PDGA computes SSA fresh every round. Par is never used.
-//  Round Rating = 1000 + (SSA − playerScore) × 7.42
-//  Player Rating = weighted rolling avg of round ratings (recent 25% 2×)
-//  pts/stroke derived from a regression on 606 real rounds across two
-//  current DGPT Elite Series events (Ale Open, Heinola Open) — R²=0.96
-//  and R²=0.9995 respectively, averaging to 7.42 pts/stroke.
+//  each day from propagator scores, exactly like real PDGA computes SSA
+//  fresh every round. Par is never used.
+//  Round Rating = 1000 + (SSA − playerScore) × pts_per_stroke(SSA)
+//  Player Rating = weighted rolling avg of round ratings (recent 25% 2×),
+//  computed over a rolling 30-day window (60-day fallback if <8 rounds).
+//
+//  Propagators (mirrors real PDGA definition): 8+ total rounds AND an
+//  established rating of 750+. Since that requires ratings to already
+//  exist, this is a two-pass calculation, identical in spirit to how
+//  PDGA uses a player's rating from BEFORE the round being rated:
+//    Pass 1: provisional ratings for every player with 8+ rounds, no
+//            rating floor, no per-propagator exclusion yet.
+//    Pass 2: propagators = 8+ rounds AND Pass-1 rating >= 750. Daily SSA
+//            is recomputed with this refined pool, applying PDGA's
+//            documented "60 points below their own rating" exclusion
+//            rule using each propagator's Pass-1 rating as their
+//            established rating. Final ratings come from this SSA.
+//
+//  Points-per-stroke ("compression", mirrors real PDGA): PDGA doesn't
+//  publish an exact formula, only approximate 18-hole reference points
+//  (~SSA 44/50.5/68 -> ~13/10/6 pts/throw). Scaled proportionally to our
+//  own average post-cutoff total par (31.09) since our 9-hole format
+//  plays at a much lower total par than PDGA's 18-hole rounds. This is
+//  a best-effort approximation of an unpublished system, not a
+//  guaranteed match to PDGA's actual internal numbers.
+//  MUST match calculate_ratings.py exactly — same constants, same logic.
 // ═══════════════════════════════════════════════════════════════════
-const RATING_PTS                 = 7.42; // pts/stroke — matches calculate_ratings.py
-const RATING_PROPAGATOR_MIN_DAYS = 8;    // min rounds to be a propagator (PDGA standard)
-const RATING_MIN_PROPAGATORS     = 3;    // min propagators needed to compute SSA
-const RATING_MIN_ROUNDS          = 3;    // min rounds before a rating is calculated at all
-const RATING_PROVISIONAL_ROUNDS  = 7;    // rounds_counted needed to drop "provisional" and
-                                          // gate Top 50 leaderboard eligibility — matches
-                                          // calculate_ratings.py exactly
+const RATING_PROPAGATOR_MIN_DAYS   = 8;    // min rounds to be a propagator (PDGA standard)
+const RATING_PROPAGATOR_MIN_RATING = 750;  // min established rating to be a propagator
+                                            // (real PDGA uses 700; raised slightly since
+                                            // 700 currently includes nearly the whole pool)
+const PROPAGATOR_EXCLUSION_MARGIN  = 60;   // a propagator's round is excluded from that
+                                            // day's SSA if it's more than this many rating
+                                            // points below their own rating (matches PDGA)
+const RATING_MIN_PROPAGATORS       = 2;    // min propagators needed to compute SSA
+                                            // (matches PDGA's documented minimum)
+const RATING_MIN_ROUNDS            = 3;    // min rounds before a rating is calculated at all
+                                            // (kept as-is; PDGA's real minimum is 1 round,
+                                            // but this project intentionally keeps a higher
+                                            // bar given our much shorter season)
+const RATING_PROVISIONAL_ROUNDS    = 7;    // rounds_counted needed to drop "provisional" and
+                                            // gate Top 50 leaderboard eligibility — matches
+                                            // calculate_ratings.py exactly
+const RATING_WINDOW_DAYS           = 30;   // primary rolling window (scaled down from PDGA's
+                                            // 12-month window to fit our much shorter season)
+const RATING_WINDOW_FALLBACK       = 60;   // fallback if < 8 rounds in primary window
+const RATING_WINDOW_MIN_ROUNDS     = 8;    // threshold that triggers fallback
+
+// Points-per-stroke compression curve — same reference points and same
+// par-scaling as calculate_ratings.py. Must use the identical hardcoded
+// PAR_SCALE_FACTOR (not recomputed client-side) so client and server
+// ratings always agree exactly.
+const PDGA_REFERENCE_PAR = 54.0;
+const OUR_AVERAGE_PAR    = 31.09; // average total par across post-cutoff history.json
+const PAR_SCALE_FACTOR   = OUR_AVERAGE_PAR / PDGA_REFERENCE_PAR;
+const COMPRESSION_ANCHORS = [
+  [44.0  * PAR_SCALE_FACTOR, 13.0],  // easy day
+  [50.5  * PAR_SCALE_FACTOR, 10.0],  // typical day
+  [68.0  * PAR_SCALE_FACTOR, 6.0],   // hard day
+];
+
+function ptsPerStroke(ssa) {
+  const [[ssaLo, ptsLo], [ssaMid, ptsMid], [ssaHi, ptsHi]] = COMPRESSION_ANCHORS;
+  if (ssa <= ssaLo) return ptsLo;
+  if (ssa <= ssaMid) {
+    const frac = (ssa - ssaLo) / (ssaMid - ssaLo);
+    return ptsLo + frac * (ptsMid - ptsLo);
+  }
+  if (ssa <= ssaHi) {
+    const frac = (ssa - ssaMid) / (ssaHi - ssaMid);
+    return ptsMid + frac * (ptsHi - ptsMid);
+  }
+  return ptsHi;
+}
 
 // Expose daily SSA so yesterday renderer can apply the correct value
 let dgvDailySSA = {};
 
-// Propagator career average RAW SCORE, using FULL history (pre+post cutoff)
-// to maximize the propagator pool — must match calculate_ratings.py.
-function buildPropagators(fullHistory) {
+// Pass 1: candidate propagators = 8+ total rounds, full history (pre+post
+// cutoff) to maximize the pool. Rating floor applied separately in Pass 2.
+function buildPropagatorCandidates(fullHistory) {
   const totals = {};
   const counts = {};
   fullHistory.forEach(day => {
@@ -2450,10 +2509,10 @@ function buildPropagators(fullHistory) {
   return props;
 }
 
-// SSA for each day = average raw score of propagators who played that day.
-// Fallback: trimmed mean of best 60% of scores when propagators are scarce.
-// Uses post-cutoff history only for actual day scores. Par is never used.
-function buildDailySSA(history, propagators) {
+// Pass 1 SSA: simple average of candidate propagator scores, no
+// per-propagator exclusion yet (no established ratings exist to compare
+// against). Fallback: trimmed mean of best 60% of scores when scarce.
+function buildDailySSASimple(history, propagators) {
   const ssa = {};
   history.forEach(day => {
     const props = day.players.filter(p => {
@@ -2470,13 +2529,74 @@ function buildDailySSA(history, propagators) {
     const propScores = props.map(p => p.score);
     ssa[day.date] = propScores.reduce((s, v) => s + v, 0) / propScores.length;
   });
+  return ssa;
+}
+
+// Pass 2 SSA: refined propagator pool (8+ rounds AND Pass-1 rating >= 750).
+// Excludes any propagator whose implied round rating that day is more than
+// PROPAGATOR_EXCLUSION_MARGIN below their own Pass-1 rating (matches PDGA's
+// documented rule), then recomputes SSA from the remaining scores.
+function buildDailySSAFinal(history, finalPropagators, prelimRatings) {
+  const ssa = {};
+  history.forEach(day => {
+    const dayProps = day.players.filter(p => {
+      const name = stripDiscTag(p.name);
+      return !isFlagged(name) && finalPropagators.has(name);
+    });
+
+    const fallback = () => {
+      const scores = day.players.map(p => p.score).sort((a, b) => a - b);
+      const trimN  = Math.max(1, Math.floor(scores.length * 0.60));
+      const trimmed = scores.slice(0, trimN);
+      ssa[day.date] = trimmed.reduce((s, v) => s + v, 0) / trimmed.length;
+    };
+
+    if (dayProps.length < RATING_MIN_PROPAGATORS) { fallback(); return; }
+
+    const prelimSSA = dayProps.reduce((s, p) => s + p.score, 0) / dayProps.length;
+    const prelimPts = ptsPerStroke(prelimSSA);
+
+    const kept = dayProps.filter(p => {
+      const name = stripDiscTag(p.name);
+      const impliedRR = 1000 + (prelimSSA - p.score) * prelimPts;
+      const ownRating = prelimRatings[name];
+      return !(ownRating !== undefined && impliedRR < ownRating - PROPAGATOR_EXCLUSION_MARGIN);
+    });
+
+    if (kept.length < RATING_MIN_PROPAGATORS) { fallback(); return; }
+    ssa[day.date] = kept.reduce((s, p) => s + p.score, 0) / kept.length;
+  });
   dgvDailySSA = ssa; // expose globally for yesterday renderer
   return ssa;
 }
 
-// Compute a single round rating: 1000 + (SSA - playerScore) x RATING_PTS
+// Compute a single round rating: 1000 + (SSA - playerScore) x ptsPerStroke(SSA)
 function computeRoundRating(playerScore, ssa) {
-  return 1000 + (ssa - playerScore) * RATING_PTS;
+  return 1000 + (ssa - playerScore) * ptsPerStroke(ssa);
+}
+
+// Filter rounds to a rolling window anchored to the player's most recent
+// round (mirrors apply_window() in calculate_ratings.py).
+function applyRatingWindow(rounds) {
+  if (!rounds || rounds.length === 0) return rounds;
+  const lastDate = rounds[rounds.length - 1].date;
+  const primaryCutoff  = shiftDate(lastDate, -RATING_WINDOW_DAYS);
+  const fallbackCutoff = shiftDate(lastDate, -RATING_WINDOW_FALLBACK);
+
+  const primary = rounds.filter(r => r.date >= primaryCutoff);
+  if (primary.length >= RATING_WINDOW_MIN_ROUNDS) return primary;
+
+  const fallback = rounds.filter(r => r.date >= fallbackCutoff);
+  if (fallback.length >= RATING_MIN_ROUNDS) return fallback;
+
+  return rounds;
+}
+
+// Simple date-string arithmetic helper (YYYY-MM-DD, UTC-safe)
+function shiftDate(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 // Compute rolling player rating from array of round ratings
@@ -2512,24 +2632,11 @@ function computeRollingRating(roundRatings) {
   return wavg;
 }
 
-// Build full rating data for all non-flagged players from history
-// Returns: { playerName: { rating, roundRatings, roundDates, provisional, bestRound, worstRound } }
-let dgvRatingCache = null;
-
-function buildAllRatings(history) {
-  if (dgvRatingCache) return dgvRatingCache;
-  if (!history || history.length === 0) return {};
-
-  const filteredHistory = history.filter(day => day.date >= DATA_CUTOFF_DATE);
-  if (filteredHistory.length === 0) return {};
-
-  // Propagators from FULL history (pre+post cutoff) to maximize the pool —
-  // daily SSA computed from post-cutoff scores only. Matches calculate_ratings.py.
-  const propagators = buildPropagators(history);
-  const dailySSA    = buildDailySSA(filteredHistory, propagators);
-
-  const playerRounds = {}; // name -> [{date, score, vsPar, roundRating}]
-
+// Shared final step for both passes: given a day->SSA map, compute every
+// player's round ratings, apply the rolling window, and return final
+// player ratings. Used for both Pass 1 (preliminary) and Pass 2 (final).
+function computeAllRatingsFromSSA(filteredHistory, dailySSA) {
+  const playerRounds = {};
   filteredHistory.forEach(day => {
     const ssa = dailySSA[day.date];
     if (ssa === undefined) return;
@@ -2543,28 +2650,61 @@ function buildAllRatings(history) {
   });
 
   const result = {};
-  Object.entries(playerRounds).forEach(([name, rounds]) => {
-    const ratingValues = rounds.map(r => r.roundRating);
+  Object.entries(playerRounds).forEach(([name, allRounds]) => {
+    const windowed = applyRatingWindow(allRounds);
+    const ratingValues = windowed.map(r => r.roundRating);
     const playerRating = computeRollingRating(ratingValues);
     if (playerRating === null) return;
     result[name] = {
       rating:       Math.round(playerRating),
-      roundRatings: rounds,
-      provisional:  rounds.length < RATING_PROVISIONAL_ROUNDS,
+      roundRatings: windowed,
+      provisional:  windowed.length < RATING_PROVISIONAL_ROUNDS,
       bestRound:    Math.round(Math.max(...ratingValues)),
       worstRound:   Math.round(Math.min(...ratingValues)),
     };
   });
+  return result;
+}
+
+// Build full rating data for all non-flagged players from history
+// Returns: { playerName: { rating, roundRatings, provisional, bestRound, worstRound } }
+let dgvRatingCache = null;
+
+function buildAllRatings(history) {
+  if (dgvRatingCache) return dgvRatingCache;
+  if (!history || history.length === 0) return {};
+
+  const filteredHistory = history.filter(day => day.date >= DATA_CUTOFF_DATE);
+  if (filteredHistory.length === 0) return {};
+
+  // Pass 1: preliminary ratings, no rating floor on propagators yet
+  const candidatePool  = buildPropagatorCandidates(history);
+  const prelimSSA      = buildDailySSASimple(filteredHistory, candidatePool);
+  const prelimFull     = computeAllRatingsFromSSA(filteredHistory, prelimSSA);
+  const prelimRatings  = {};
+  Object.entries(prelimFull).forEach(([name, d]) => { prelimRatings[name] = d.rating; });
+
+  // Pass 2: refine propagator pool to 8+ rounds AND 750+ rating
+  const finalPropagators = new Set(
+    Object.keys(candidatePool).filter(name => (prelimRatings[name] || 0) >= RATING_PROPAGATOR_MIN_RATING)
+  );
+  const finalSSA = buildDailySSAFinal(filteredHistory, finalPropagators, prelimRatings);
+  const result    = computeAllRatingsFromSSA(filteredHistory, finalSSA);
 
   dgvRatingCache = result;
   return result;
 }
 
+
 // Get today's round rating for a player given their today score
-// No difficulty offset applied for live leaderboard (today not yet in history)
+// No difficulty offset applied for live leaderboard (today not yet in history).
+// Uses the "typical day" compression anchor since today's actual SSA doesn't
+// exist yet — this is a rough live-preview estimate only, not used in any
+// stored rating. (Currently unused/no callers — kept for potential future use.)
 function getTodayRoundRating(playerName, todayVsPar) {
   if (isFlagged(playerName)) return null;
-  return Math.round(1000 - todayVsPar * RATING_PTS);
+  const typicalPts = COMPRESSION_ANCHORS[1][1]; // "typical day" anchor, 10.0
+  return Math.round(1000 - todayVsPar * typicalPts);
 }
 
 // Invalidate cache when history reloads
