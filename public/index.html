@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Disc Golf Valley VR — Daily Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root {
     /* Backgrounds — deep forest canopy shadows */
@@ -463,6 +464,50 @@
     transition: border-color 0.2s, color 0.2s;
   }
   .top50-close-btn:hover { border-color: var(--white); color: var(--white); }
+  /* Export button — desktop only, sits above Close, auto-width not full-width */
+  .top50-export-row {
+    display: none; /* shown via min-width media query below */
+    justify-content: center;
+    margin-top: 16px;
+    position: relative;
+  }
+  @media (min-width: 601px) {
+    .top50-export-row { display: flex; }
+  }
+  .top50-export-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 10px 22px; border-radius: 4px; cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .top50-export-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .top50-export-menu {
+    display: none;
+    position: absolute; bottom: calc(100% + 6px);
+    left: 50%; transform: translateX(-50%);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    z-index: 10;
+    min-width: 120px;
+  }
+  .top50-export-menu.open { display: block; }
+  .top50-export-menu button {
+    display: block; width: 100%;
+    background: transparent; border: none;
+    color: var(--white); font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 10px 16px; cursor: pointer; text-align: center;
+  }
+  .top50-export-menu button:hover { background: rgba(46,207,170,0.1); color: var(--accent2); }
+  .top50-export-menu button + button { border-top: 1px solid var(--border); }
+  /* While exporting a photo: expand the list to full natural height and
+     hide the export/close controls so they don't appear in the capture */
+  .top50-modal.exporting { max-height: none; }
+  .top50-modal.exporting .top50-list { overflow: visible; max-height: none; }
+  .top50-modal.exporting .top50-export-row,
+  .top50-modal.exporting .top50-close-btn { display: none; }
   .history-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,0.72); z-index: 1000;
@@ -2408,7 +2453,7 @@ function renderTop50List() {
   const lastRank = ranked.length > 0 ? ranked[ranked.length - 1].displayRank : 0;
   for (let p = lastRank + 1; p <= tier; p++) {
     html += `
-      <div class="top50-row" style="cursor:default;">
+      <div class="top50-row top50-row-placeholder" style="cursor:default;">
         <div class="top50-rank">${p}</div>
         <div class="top50-name" style="color:var(--muted);font-style:italic;font-size:12px;">Not Enough Players</div>
         <div class="top50-rating" style="color:var(--muted);">N/A</div>
@@ -2417,6 +2462,108 @@ function renderTop50List() {
 
   container.innerHTML = html;
 }
+
+// ── Export menu (desktop only) ────────────────────────────────────────
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  document.getElementById('top50ExportMenu').classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('top50ExportMenu');
+  if (menu && menu.classList.contains('open') && !menu.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
+
+function exportFilenameBase() {
+  const dateStr = (ratingsData && ratingsData.generated) || new Date().toISOString().slice(0, 10);
+  return `DGV_VR_Ratings_${dateStr}`;
+}
+
+// Read whatever is currently rendered in the modal (real rows only, no
+// placeholders) so exports always exactly match what's on screen.
+function getExportableRows() {
+  const rows = Array.from(document.querySelectorAll('#top50List .top50-row:not(.top50-row-placeholder)'));
+  return rows.map(row => ({
+    rank:   row.querySelector('.top50-rank').textContent.trim(),
+    name:   row.querySelector('.top50-name').textContent.trim(),
+    rating: row.querySelector('.top50-rating').textContent.trim(),
+    rankCls: row.querySelector('.top50-rank').classList.contains('top1') ? 'top1'
+           : row.querySelector('.top50-rank').classList.contains('top2') ? 'top2'
+           : row.querySelector('.top50-rank').classList.contains('top3') ? 'top3' : '',
+  }));
+}
+
+async function exportTop50AsPhoto() {
+  document.getElementById('top50ExportMenu').classList.remove('open');
+  if (typeof html2canvas === 'undefined') {
+    alert('Export library still loading — please try again in a moment.');
+    return;
+  }
+  const modal = document.querySelector('.top50-modal');
+  modal.classList.add('exporting');
+  // Wait a frame for the layout to reflow to full height before capturing
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  try {
+    const canvas = await html2canvas(modal, {
+      backgroundColor: '#112030',
+      scale: 2,
+    });
+    const link = document.createElement('a');
+    link.download = `${exportFilenameBase()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch (err) {
+    console.error('Photo export failed:', err);
+    alert('Sorry, the photo export failed. Please try again.');
+  } finally {
+    modal.classList.remove('exporting');
+  }
+}
+
+function exportTop50AsText() {
+  document.getElementById('top50ExportMenu').classList.remove('open');
+  const rows  = getExportableRows();
+  const title = document.querySelector('.top50-title').textContent;
+  const subtitle = document.querySelector('.top50-subtitle').textContent;
+
+  // Color table: 1=white(text) 2=gold 3=silver 4=bronze 5=muted(rank/subtitle) 6=card(bg)
+  const rtfHeader = String.raw`{\rtf1\ansi\ansicpg1252\deff0
+{\fonttbl{\f0\fmodern\fcharset0 DM Mono;}{\f1\fswiss\fcharset0 DM Sans;}}
+{\colortbl;\red237\green246\blue255;\red240\green180\blue41;\red176\green190\blue197;\red205\green127\blue50;\red110\green154\blue181;\red17\green32\blue48;}
+\viewkind4\uc1
+\pard\qc\f1\fs28\cf1\b ${rtfEscape(title)}\b0\par
+\fs18\cf5 ${rtfEscape(subtitle)}\par
+\par
+\pard\ql\f0\fs20
+`;
+
+  let body = '';
+  rows.forEach(r => {
+    const colorIdx = r.rankCls === 'top1' ? 2 : r.rankCls === 'top2' ? 3 : r.rankCls === 'top3' ? 4 : 1;
+    const rankStr  = r.rank.padEnd(4, ' ');
+    const nameStr  = r.name.padEnd(24, ' ');
+    body += String.raw`\cf${colorIdx}\b ${rtfEscape(rankStr)}\b0\cf1 ${rtfEscape(nameStr)}${rtfEscape(r.rating)}\line` + '\n';
+  });
+
+  const rtfContent = rtfHeader + body + '\\par}';
+
+  const blob = new Blob([rtfContent], { type: 'application/rtf' });
+  const link = document.createElement('a');
+  link.download = `${exportFilenameBase()}.rtf`;
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function rtfEscape(str) {
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/{/g, '\\{')
+    .replace(/}/g, '\\}')
+    .replace(/[\u0080-\uFFFF]/g, ch => `\\u${ch.charCodeAt(0)}?`);
+}
+
 //  True PDGA SSA method — no fixed anchor point. SSA is computed fresh
 //  each day from propagator scores, exactly like real PDGA computes SSA
 //  fresh every round. Par is never used.
@@ -3015,6 +3162,13 @@ window.addEventListener('resize', applyMarquee);
       <div class="top50-title">DGV VR Ratings</div>
       <div class="top50-subtitle">Top 50 Rankings · Updated Weekly</div>
       <div class="top50-list" id="top50List"></div>
+      <div class="top50-export-row">
+        <button class="top50-export-btn" onclick="toggleExportMenu(event)">Export</button>
+        <div class="top50-export-menu" id="top50ExportMenu">
+          <button onclick="exportTop50AsPhoto()">Photo</button>
+          <button onclick="exportTop50AsText()">Text</button>
+        </div>
+      </div>
       <button class="top50-close-btn" onclick="closeTop50Modal()">Close</button>
     </div>
   </div>
