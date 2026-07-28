@@ -2527,30 +2527,26 @@ function exportTop50AsText() {
   const title = document.querySelector('.top50-title').textContent;
   const subtitle = document.querySelector('.top50-subtitle').textContent;
 
-  // Column widths mirror the on-screen layout (rank | player | rating).
-  // All text is plain black — Courier New is used instead of the site's
-  // custom web font since it's a font virtually every device/reader has
-  // installed, so alignment actually holds when opened or pasted elsewhere
-  // (a missing custom font would silently fall back to a proportional font
-  // and destroy the column spacing).
-  const RANK_W   = 6;
-  const NAME_W   = 24;
-
+  // NOTE: intentionally NOT using space-padded columns here. Destinations
+  // like Facebook's post composer always render pasted text in their own
+  // proportional UI font, ignoring any font/formatting from the clipboard —
+  // so column alignment built from fixed character widths breaks the
+  // instant it lands somewhere that isn't monospace. A delimiter-based
+  // one-line-per-player format reads correctly regardless of font, so it
+  // survives being pasted anywhere instead of just looking right when
+  // opened directly as a .rtf file.
   const rtfHeader = String.raw`{\rtf1\ansi\ansicpg1252\deff0
-{\fonttbl{\f0\fmodern\fcharset0 Courier New;}{\f1\fswiss\fcharset0 Arial;}}
+{\fonttbl{\f0\fswiss\fcharset0 Arial;}}
 \viewkind4\uc1
-\pard\qc\f1\fs28\b ${rtfEscape(title)}\b0\par
+\pard\qc\f0\fs28\b ${rtfEscape(title)}\b0\par
 \fs18 ${rtfEscape(subtitle)}\par
 \par
-\pard\ql\f0\fs20\b ${rtfEscape('RANK'.padEnd(RANK_W, ' ') + 'PLAYER'.padEnd(NAME_W, ' ') + 'RATING')}\b0\line
-${rtfEscape('-'.repeat(RANK_W + NAME_W + 6))}\line
+\pard\ql\fs20
 `;
 
   let body = '';
   rows.forEach(r => {
-    const rankStr  = r.rank.padEnd(RANK_W, ' ');
-    const nameStr  = r.name.padEnd(NAME_W, ' ');
-    body += String.raw`\b ${rtfEscape(rankStr)}\b0${rtfEscape(nameStr)}${rtfEscape(r.rating)}\line` + '\n';
+    body += String.raw`\b ${rtfEscape(r.rank)}.\b0  ${rtfEscape(r.name)} - ${rtfEscape(r.rating)}\line` + '\n';
   });
 
   const rtfContent = rtfHeader + body + '\\par}';
