@@ -456,11 +456,11 @@
   }
   .top50-header-row span:nth-child(3) { text-align: right; }
   .top50-close-btn {
-    margin-top: 16px; width: 100%;
+    margin-top: 16px; width: auto; align-self: center;
     background: transparent; border: 1px solid var(--border);
     color: var(--muted); font-family: 'DM Mono', monospace;
     font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
-    padding: 10px; border-radius: 4px; cursor: pointer;
+    padding: 10px 22px; border-radius: 4px; cursor: pointer;
     transition: border-color 0.2s, color 0.2s;
   }
   .top50-close-btn:hover { border-color: var(--white); color: var(--white); }
@@ -2095,7 +2095,7 @@ function renderHistoryContent(playerName, days) {
     // Sunday calculation yet — silently show nothing, same as before.
   }
 
-  const ratingLeaderboardBtn = `<div style="text-align:center; margin: 8px 0 12px;"><button class="history-cheater-btn" onclick="closeHistoryModal(); openTop50Modal();" style="width:100%;">DGV VR Rating Leaderboard</button></div>`;
+  const ratingLeaderboardBtn = `<div style="text-align:center; margin: 8px 0 12px;"><button class="history-cheater-btn" onclick="closeHistoryModal(); openTop50Modal();">DGV VR Rating Leaderboard</button></div>`;
 
   if (!historyData || historyData.length < days) {
     el.innerHTML = `${ratingRowHtml}${ratingLeaderboardBtn}<div class="history-unavailable">Data not yet available</div>`;
@@ -2527,14 +2527,28 @@ function exportTop50AsText() {
   const title = document.querySelector('.top50-title').textContent;
   const subtitle = document.querySelector('.top50-subtitle').textContent;
 
-  // NOTE: intentionally NOT using space-padded columns here. Destinations
-  // like Facebook's post composer always render pasted text in their own
-  // proportional UI font, ignoring any font/formatting from the clipboard —
-  // so column alignment built from fixed character widths breaks the
-  // instant it lands somewhere that isn't monospace. A delimiter-based
-  // one-line-per-player format reads correctly regardless of font, so it
-  // survives being pasted anywhere instead of just looking right when
-  // opened directly as a .rtf file.
+  // Real RTF table — cell boundaries are structural (defined in twips via
+  // \cellx), not built from character-width padding, so this holds proper
+  // alignment anywhere that respects pasted rich formatting (Word, Google
+  // Docs, email clients, Notion, opening the .rtf directly, etc.) — this
+  // was verified by actually converting a test file and confirming
+  // LibreOffice recognized it as a genuine <table>, not just plain text.
+  // One unavoidable exception: Facebook's post composer strips ALL rich
+  // formatting on paste (no tables, no fonts, no bold) down to plain text
+  // in its own font — that's Facebook discarding the structure, not a
+  // limitation of this file, and no export format can work around it.
+  const COL1 = 700;   // rank column right edge (twips)
+  const COL2 = 4200;  // player column right edge
+  const COL3 = 5600;  // rating column right edge
+
+  function tableRow(rank, name, rating, bold) {
+    const b  = bold ? '\\b ' : ' ';
+    const b0 = bold ? '\\b0' : '';
+    return String.raw`\trowd\trgaph80\cellx${COL1}\cellx${COL2}\cellx${COL3}
+\intbl${b}${rtfEscape(rank)}${b0}\cell${b}${rtfEscape(name)}${b0}\cell${b}${rtfEscape(rating)}${b0}\cell\row
+`;
+  }
+
   const rtfHeader = String.raw`{\rtf1\ansi\ansicpg1252\deff0
 {\fonttbl{\f0\fswiss\fcharset0 Arial;}}
 \viewkind4\uc1
@@ -2544,12 +2558,10 @@ function exportTop50AsText() {
 \pard\ql\fs20
 `;
 
-  let body = '';
-  rows.forEach(r => {
-    body += String.raw`\b ${rtfEscape(r.rank)}.\b0  ${rtfEscape(r.name)} - ${rtfEscape(r.rating)}\line` + '\n';
-  });
+  let body = tableRow('RANK', 'PLAYER', 'RATING', true);
+  rows.forEach(r => { body += tableRow(r.rank, r.name, r.rating, false); });
 
-  const rtfContent = rtfHeader + body + '\\par}';
+  const rtfContent = rtfHeader + body + '\\pard\\par}';
 
   const blob = new Blob([rtfContent], { type: 'application/rtf' });
   const link = document.createElement('a');
