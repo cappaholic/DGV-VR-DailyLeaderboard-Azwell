@@ -490,7 +490,7 @@
     border-radius: 6px; overflow: hidden;
     box-shadow: 0 6px 20px rgba(0,0,0,0.4);
     z-index: 10;
-    min-width: 120px;
+    min-width: 90px;
   }
   .top50-export-menu.open { display: block; }
   .top50-export-menu button {
@@ -498,7 +498,7 @@
     background: transparent; border: none;
     color: var(--white); font-family: 'DM Mono', monospace;
     font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
-    padding: 10px 16px; cursor: pointer; text-align: center;
+    padding: 10px 20px; cursor: pointer; text-align: center;
   }
   .top50-export-menu button:hover { background: rgba(46,207,170,0.1); color: var(--accent2); }
   .top50-export-menu button + button { border-top: 1px solid var(--border); }
@@ -2527,28 +2527,12 @@ function exportTop50AsText() {
   const title = document.querySelector('.top50-title').textContent;
   const subtitle = document.querySelector('.top50-subtitle').textContent;
 
-  // Real RTF table — cell boundaries are structural (defined in twips via
-  // \cellx), not built from character-width padding, so this holds proper
-  // alignment anywhere that respects pasted rich formatting (Word, Google
-  // Docs, email clients, Notion, opening the .rtf directly, etc.) — this
-  // was verified by actually converting a test file and confirming
-  // LibreOffice recognized it as a genuine <table>, not just plain text.
-  // One unavoidable exception: Facebook's post composer strips ALL rich
-  // formatting on paste (no tables, no fonts, no bold) down to plain text
-  // in its own font — that's Facebook discarding the structure, not a
-  // limitation of this file, and no export format can work around it.
-  const COL1 = 700;   // rank column right edge (twips)
-  const COL2 = 4200;  // player column right edge
-  const COL3 = 5600;  // rating column right edge
-
-  function tableRow(rank, name, rating, bold) {
-    const b  = bold ? '\\b ' : ' ';
-    const b0 = bold ? '\\b0' : '';
-    return String.raw`\trowd\trgaph80\cellx${COL1}\cellx${COL2}\cellx${COL3}
-\intbl${b}${rtfEscape(rank)}${b0}\cell${b}${rtfEscape(name)}${b0}\cell${b}${rtfEscape(rating)}${b0}\cell\row
-`;
-  }
-
+  // Delimiter-based one-line-per-player format — reads correctly no matter
+  // what font a paste destination substitutes (e.g. Facebook's post
+  // composer, which renders pasted text in its own font regardless of any
+  // formatting in the clipboard). Column-aligned layouts break the moment
+  // they land somewhere non-monospace; this format doesn't depend on
+  // character-width alignment at all, so it holds up everywhere.
   const rtfHeader = String.raw`{\rtf1\ansi\ansicpg1252\deff0
 {\fonttbl{\f0\fswiss\fcharset0 Arial;}}
 \viewkind4\uc1
@@ -2558,10 +2542,12 @@ function exportTop50AsText() {
 \pard\ql\fs20
 `;
 
-  let body = tableRow('RANK', 'PLAYER', 'RATING', true);
-  rows.forEach(r => { body += tableRow(r.rank, r.name, r.rating, false); });
+  let body = '';
+  rows.forEach(r => {
+    body += String.raw`\b ${rtfEscape(r.rank)}.\b0  ${rtfEscape(r.name)} - ${rtfEscape(r.rating)}\line` + '\n';
+  });
 
-  const rtfContent = rtfHeader + body + '\\pard\\par}';
+  const rtfContent = rtfHeader + body + '\\par}';
 
   const blob = new Blob([rtfContent], { type: 'application/rtf' });
   const link = document.createElement('a');
