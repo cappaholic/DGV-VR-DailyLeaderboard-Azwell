@@ -2519,7 +2519,7 @@ function buildRowHtml(r) {
   return `
     <div style="display:grid;grid-template-columns:28px 1fr 50px;column-gap:8px;padding:5px 4px;align-items:center;">
       <span style="font-family:'DM Mono',monospace;color:${rankColor(r.rankCls)};font-size:12px;font-weight:600;text-align:center;">${escapeHtml(r.rank)}</span>
-      <span style="font-family:'DM Sans',sans-serif;color:#edf6ff;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.name)}</span>
+      <span style="font-family:'DM Sans',sans-serif;color:#edf6ff;font-size:14px;word-break:break-word;">${escapeHtml(r.name)}</span>
       <span style="font-family:'DM Mono',monospace;color:#edf6ff;font-size:16px;font-weight:400;text-align:right;">${escapeHtml(r.rating)}</span>
     </div>`;
 }
@@ -2531,7 +2531,7 @@ function buildRowHtml(r) {
 // as-is (verified working, so left untouched for that common case).
 function buildMultiColumnExportElement(rows, title, subtitle) {
   const numCols = Math.ceil(rows.length / EXPORT_ROWS_PER_COLUMN);
-  const colWidth = 220;
+  const colWidth = 300;
   const gap = 32;
   const totalWidth = numCols * colWidth + (numCols - 1) * gap + 56;
 
