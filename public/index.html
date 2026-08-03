@@ -2503,24 +2503,24 @@ function rankColor(rankCls) {
   return rankCls === 'top1' ? '#f0b429'
        : rankCls === 'top2' ? '#b0bec5'
        : rankCls === 'top3' ? '#cd7f32'
-       : '#8fb4cc';
+       : '#6e9ab5';
 }
 
 function buildColumnHeaderHtml() {
   return `
     <div style="display:grid;grid-template-columns:28px 1fr 50px;column-gap:8px;padding:0 4px 8px;border-bottom:1px solid #1e3d55;margin-bottom:6px;">
-      <span style="color:#6e9ab5;font-size:9px;letter-spacing:1px;">RANK</span>
-      <span style="color:#6e9ab5;font-size:9px;letter-spacing:1px;">PLAYER</span>
-      <span style="color:#6e9ab5;font-size:9px;letter-spacing:1px;text-align:right;">RATING</span>
+      <span style="font-family:'DM Mono',monospace;color:#6e9ab5;font-size:9px;letter-spacing:2px;text-transform:uppercase;">RANK</span>
+      <span style="font-family:'DM Mono',monospace;color:#6e9ab5;font-size:9px;letter-spacing:2px;text-transform:uppercase;">PLAYER</span>
+      <span style="font-family:'DM Mono',monospace;color:#6e9ab5;font-size:9px;letter-spacing:2px;text-transform:uppercase;text-align:right;">RATING</span>
     </div>`;
 }
 
 function buildRowHtml(r) {
   return `
     <div style="display:grid;grid-template-columns:28px 1fr 50px;column-gap:8px;padding:5px 4px;align-items:center;">
-      <span style="color:${rankColor(r.rankCls)};font-size:12px;font-weight:700;">${escapeHtml(r.rank)}</span>
-      <span style="color:#edf6ff;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.name)}</span>
-      <span style="color:#edf6ff;font-size:13px;text-align:right;">${escapeHtml(r.rating)}</span>
+      <span style="font-family:'DM Mono',monospace;color:${rankColor(r.rankCls)};font-size:12px;font-weight:600;text-align:center;">${escapeHtml(r.rank)}</span>
+      <span style="font-family:'DM Sans',sans-serif;color:#edf6ff;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.name)}</span>
+      <span style="font-family:'DM Mono',monospace;color:#edf6ff;font-size:16px;font-weight:400;text-align:right;">${escapeHtml(r.rating)}</span>
     </div>`;
 }
 
@@ -2549,10 +2549,10 @@ function buildMultiColumnExportElement(rows, title, subtitle) {
   const container = document.createElement('div');
   container.style.cssText = `position:fixed; left:-9999px; top:0; width:${totalWidth}px;`;
   container.innerHTML = `
-    <div style="background:#0d1b2a; border-top:3px solid #2ecfaa; border-radius:10px; padding:24px 28px; font-family:'Courier New', monospace;">
+    <div style="background:#112030; border:1px solid #1e3d55; border-top:2px solid #2ecfaa; border-radius:10px; padding:24px 28px; font-family:'DM Mono', monospace;">
       <div style="text-align:center; margin-bottom:4px;">
-        <div style="color:#edf6ff; font-size:20px; font-weight:700; font-family:Arial, sans-serif;">${escapeHtml(title)}</div>
-        <div style="color:#6e9ab5; font-size:11px; letter-spacing:2px; margin-top:4px;">${escapeHtml(subtitle)}</div>
+        <div style="font-family:'DM Sans', sans-serif; color:#edf6ff; font-size:16px; font-weight:500;">${escapeHtml(title)}</div>
+        <div style="font-size:9px; letter-spacing:2px; color:#6e9ab5; text-transform:uppercase; margin-top:4px;">${escapeHtml(subtitle)}</div>
       </div>
       <div style="display:flex; gap:${gap}px; margin-top:18px;">
         ${columnsHtml}
