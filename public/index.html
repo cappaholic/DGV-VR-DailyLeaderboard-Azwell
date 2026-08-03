@@ -506,6 +506,7 @@
      hide the export/close controls so they don't appear in the capture */
   .top50-modal.exporting { max-height: none; }
   .top50-modal.exporting .top50-list { overflow: visible; max-height: none; }
+  .top50-modal.exporting .top50-header-row { position: static; }
   .top50-modal.exporting .top50-export-row,
   .top50-modal.exporting .top50-close-btn { display: none; }
   .history-overlay {
@@ -2501,7 +2502,9 @@ async function exportTop50AsPhoto() {
     return;
   }
   const modal = document.querySelector('.top50-modal');
+  const list  = document.getElementById('top50List');
   modal.classList.add('exporting');
+  if (list) list.scrollTop = 0;
   // Wait a frame for the layout to reflow to full height before capturing
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   try {
