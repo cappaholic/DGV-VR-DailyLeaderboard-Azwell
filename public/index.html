@@ -120,12 +120,25 @@
     margin-bottom: 14px;
     flex-wrap: wrap;
     gap: 8px;
+    position: relative;
   }
   .layout-title-group { display: flex; align-items: baseline; gap: 12px; }
   .layout-section-label {
     font-family: 'DM Mono', monospace;
     font-size: 9px; letter-spacing: 2px;
     color: var(--muted); text-transform: uppercase;
+  }
+  .layout-waiting-banner {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; letter-spacing: 2px;
+    color: #debc3e; text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .courses-row.stale-data, .scorecard-row.stale-data {
+    opacity: 0.35;
   }
   .seed-badge {
     font-family: 'DM Mono', monospace;
@@ -383,6 +396,25 @@
     }
     .side-hole-label-item { white-space: nowrap; }
     .side-hole-label-white { color: var(--white); }
+    .side-hole-placeholder-box {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 0;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .side-hole-placeholder-text {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px; letter-spacing: 1px;
+      line-height: 1.7;
+      color: #debc3e;
+      text-align: center;
+      text-transform: uppercase;
+    }
   }
   .top50-overlay {
     display: none; position: fixed; inset: 0;
@@ -1478,6 +1510,69 @@ function renderSnapshotLeaderboard(snap) {
 }
 
 // Refresh only the leaderboard rows without hiding the section or jumping the page
+// Shared core: seed-check + full scores fetch. Used by both the manual
+// Refresh button and the automatic background poll after a detected daily
+// reset (see handleDailyReset/pollForNewLayout below). Deliberately does
+// NOT touch viewingYesterday state — if the user is currently browsing
+// yesterday's leaderboard, this quietly updates today's data in the
+// background without yanking their view away; the button-click path
+// decides separately whether to switch them back to "today".
+async function syncTodayData() {
+  // Check whether the daily seed has changed (i.e. the game has reset
+  // to a new day) since we last built the layout. Only rebuild the
+  // layout/hole photos if it has — this keeps routine syncs fast and
+  // avoids needless photo re-loading when nothing has changed.
+  try {
+    const currentSeed = await fetchDailySeed(accessToken);
+    if (currentSeed !== todaySeed) {
+      const layout = generateLayout(currentSeed);
+      renderLayout(currentSeed, layout);
+      seededPar   = layout.totalPar;
+      todaySeed   = currentSeed;
+      todayLayout = layout;
+      // The daily reset also means yesterday.json now points to a new
+      // day — re-fetch it so the "Yesterday's Leaderboard" button shows
+      // the day that just ended, not the one before it.
+      loadYesterdaySnapshot();
+    }
+  } catch (seedErr) {
+    console.warn('Seed check failed during sync:', seedErr.message);
+  }
+
+  const first = await fetchScoresPage(accessToken, 0, 100);
+  totalScores = first.total || (first.results || []).length;
+  const pages = [first.results || []];
+
+  if (totalScores > 100) {
+    const fetches = [];
+    for (let offset = 100; offset < totalScores; offset += 100) {
+      fetches.push(fetchScoresPage(accessToken, offset, 100));
+    }
+    const rest = await Promise.all(fetches);
+    rest.forEach(r => pages.push(r.results || []));
+  }
+
+  allScoresGlobal = pages.flat();
+  globalRanks     = computeTiedRanks(allScoresGlobal);
+
+  if (viewingYesterday) return; // don't touch the on-screen list right now
+
+  if (allScoresGlobal.length > 0) {
+    renderLeaderboard();
+    document.getElementById('leaderboardSection').style.display = 'block';
+    document.getElementById('emptyState').style.display = 'none';
+  } else {
+    // No scores yet for the (possibly new) day — clear stale rows
+    // instead of silently leaving yesterday's leaderboard on screen.
+    document.getElementById('lbRows').innerHTML = '';
+    document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyStateMsg').textContent = 'No scores yet — check back soon!';
+    document.getElementById('leaderboardSection').style.display = 'block';
+    updateYesterdayBtn();
+  }
+}
+
 async function refreshLeaderboardOnly() {
   if (viewingYesterday) { showTodayLeaderboard(); return; }
   if (!accessToken) { autoLoadToken(); return; }
@@ -1486,62 +1581,164 @@ async function refreshLeaderboardOnly() {
   if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
 
   try {
-    // Check whether the daily seed has changed (i.e. the game has reset
-    // to a new day) since we last built the layout. Only rebuild the
-    // layout/hole photos if it has — this keeps the quick refresh fast
-    // and avoids needless photo re-loading when nothing has changed.
-    try {
-      const currentSeed = await fetchDailySeed(accessToken);
-      if (currentSeed !== todaySeed) {
-        const layout = generateLayout(currentSeed);
-        renderLayout(currentSeed, layout);
-        seededPar   = layout.totalPar;
-        todaySeed   = currentSeed;
-        todayLayout = layout;
-        // The daily reset also means yesterday.json now points to a new
-        // day — re-fetch it so the "Yesterday's Leaderboard" button shows
-        // the day that just ended, not the one before it.
-        loadYesterdaySnapshot();
-      }
-    } catch (seedErr) {
-      console.warn('Seed check failed during refresh:', seedErr.message);
-    }
-
-    const first = await fetchScoresPage(accessToken, 0, 100);
-    totalScores = first.total || (first.results || []).length;
-    const pages = [first.results || []];
-
-    if (totalScores > 100) {
-      const fetches = [];
-      for (let offset = 100; offset < totalScores; offset += 100) {
-        fetches.push(fetchScoresPage(accessToken, offset, 100));
-      }
-      const rest = await Promise.all(fetches);
-      rest.forEach(r => pages.push(r.results || []));
-    }
-
-    allScoresGlobal = pages.flat();
-    globalRanks     = computeTiedRanks(allScoresGlobal);
-
-    if (allScoresGlobal.length > 0) {
-      renderLeaderboard();
-      document.getElementById('leaderboardSection').style.display = 'block';
-      document.getElementById('emptyState').style.display = 'none';
-    } else {
-      // No scores yet for the (possibly new) day — clear stale rows
-      // instead of silently leaving yesterday's leaderboard on screen.
-      document.getElementById('lbRows').innerHTML = '';
-      document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
-      document.getElementById('emptyState').style.display = 'block';
-      document.getElementById('emptyStateMsg').textContent = 'No scores yet — check back soon!';
-      document.getElementById('leaderboardSection').style.display = 'block';
-      updateYesterdayBtn();
-    }
+    await syncTodayData();
   } catch (err) {
     console.error('Refresh failed:', err);
     if (err.message && err.message.includes('401')) { autoLoadToken(); return; }
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Automatic daily-reset handling
+//
+//  Previously, a new day's layout only appeared once fetchDailySeed()
+//  actually returned a different value — entirely dependent on the game's
+//  backend having already published it. If that publish lagged a few
+//  minutes behind the real reset boundary, the site kept silently showing
+//  the previous day's holes/course/layout with no indication anything
+//  was stale. This hooks into the existing countdown timer (which already
+//  ticks every second and already detects the reset boundary precisely)
+//  to react to the CLOCK crossing into a new day, independent of whether
+//  the seed has actually changed yet:
+//    - Today's leaderboard is immediately cleared/reset
+//    - The holes/course/layout area shows a clear placeholder instead of
+//      continuing to display the now-stale previous layout
+//    - yesterday.json is re-fetched right away
+//    - A bounded background poll checks for the real new seed every 30s
+//      for up to ~6 minutes, swapping in the real layout the moment it's
+//      actually available — no manual refresh needed
+// ═══════════════════════════════════════════════════════════════════
+let dailyResetHandledFor = null; // startUTC timestamp of the window we've already handled
+let layoutPollTimer      = null;
+
+function showLayoutPlaceholder() {
+  const seedBadge = document.getElementById('seedBadge');
+  const parBadge   = document.getElementById('layoutParBadge');
+  const scorecardParBadge = document.getElementById('scorecardParBadge');
+  if (seedBadge) seedBadge.textContent = 'Seed —';
+  if (parBadge) parBadge.textContent = '—';
+  if (scorecardParBadge) scorecardParBadge.textContent = 'TOTAL PAR —';
+
+  // Keep the previous (now-stale) courses/layout content visible but
+  // dimmed, rather than replacing it outright — gives the player context
+  // that this WAS today's layout a moment ago, not a blank/broken state.
+  const coursesRow   = document.getElementById('coursesRow');
+  const scorecardRow = document.getElementById('scorecardRow');
+  if (coursesRow)   coursesRow.classList.add('stale-data');
+  if (scorecardRow) scorecardRow.classList.add('stale-data');
+
+  addWaitingBanner(coursesRow);
+  addWaitingBanner(scorecardRow);
+
+  document.getElementById('scorecardSection').style.display = 'block';
+  document.getElementById('layoutStrip').classList.add('show');
+
+  showSidePanelsPlaceholder();
+}
+
+function addWaitingBanner(rowEl) {
+  if (!rowEl) return;
+  const topRow = rowEl.previousElementSibling; // .layout-top-row sits directly before the row in markup
+  if (!topRow || !topRow.classList.contains('layout-top-row')) return;
+  if (topRow.querySelector('.layout-waiting-banner')) return; // already added
+  const banner = document.createElement('span');
+  banner.className = 'layout-waiting-banner';
+  banner.textContent = "Waiting for today's data";
+  topRow.appendChild(banner);
+}
+
+function clearWaitingBanners() {
+  document.querySelectorAll('.layout-waiting-banner').forEach(el => el.remove());
+  const coursesRow   = document.getElementById('coursesRow');
+  const scorecardRow = document.getElementById('scorecardRow');
+  if (coursesRow)   coursesRow.classList.remove('stale-data');
+  if (scorecardRow) scorecardRow.classList.remove('stale-data');
+}
+
+// Individual hole-photo placeholder — thin uniform border (matching the
+// side title box's top/bottom edge style, not its yellow side accent),
+// two-line "waiting" text in that same yellow. The "Hole N" caption below
+// stays as normal; par/distance show as dashes since they're unknown yet.
+function sideHolePlaceholderHtml(holeNum) {
+  const unitLabel = distUnit === 'm' ? 'M' : 'FT';
+  return `
+    <div class="side-hole-pip">
+      <div class="side-hole-placeholder-box">
+        <span class="side-hole-placeholder-text">Waiting for<br>Today's Data</span>
+      </div>
+      <div class="side-hole-label">
+        <span class="side-hole-label-item">Hole <span class="side-hole-label-white">${holeNum}</span></span>
+        <span class="side-hole-label-item">PAR -</span>
+        <span class="side-hole-label-item">- ${unitLabel}</span>
+      </div>
+    </div>`;
+}
+
+function showSidePanelsPlaceholder() {
+  if (window.innerWidth < 1200) return; // desktop only, same guard as startSidePanels
+  // spL0 (the "Today's Layout" title box) is intentionally left untouched.
+  const leftIds  = ['spL1','spL2','spL3','spL4'];
+  const rightIds = ['spR0','spR1','spR2','spR3','spR4'];
+  let holeNum = 1;
+  leftIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = sideHolePlaceholderHtml(holeNum);
+    holeNum++;
+  });
+  rightIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = sideHolePlaceholderHtml(holeNum);
+    holeNum++;
+  });
+}
+
+function handleDailyReset() {
+  const { startUTC } = getDailyWindow();
+  const windowKey = startUTC.getTime();
+  if (dailyResetHandledFor === windowKey) return; // already handled this window
+  dailyResetHandledFor = windowKey;
+  if (layoutPollTimer) { clearTimeout(layoutPollTimer); layoutPollTimer = null; }
+
+  console.log('Daily reset boundary crossed — resetting today\'s view and watching for the new layout.');
+
+  showLayoutPlaceholder();
+  if (!viewingYesterday) {
+    document.getElementById('lbRows').innerHTML = '';
+    document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyStateMsg').textContent = 'New day started — waiting for today\'s layout...';
+    document.getElementById('leaderboardSection').style.display = 'block';
+  }
+
+  loadYesterdaySnapshot();
+  pollForNewLayout(windowKey, 0);
+}
+
+const LAYOUT_POLL_MAX_TRIES    = 12;    // ~6 minutes at 30s apart — generous safety margin
+const LAYOUT_POLL_INTERVAL_MS  = 30000;
+
+async function pollForNewLayout(windowKey, attempt) {
+  if (windowKey !== dailyResetHandledFor) return; // superseded by a newer reset
+  if (!accessToken) {
+    layoutPollTimer = setTimeout(() => pollForNewLayout(windowKey, attempt + 1), LAYOUT_POLL_INTERVAL_MS);
+    return;
+  }
+
+  const seedBefore = todaySeed;
+  try {
+    await syncTodayData();
+  } catch (err) {
+    console.warn('Background layout poll failed:', err.message);
+  }
+
+  if (todaySeed !== seedBefore) return; // seed changed — syncTodayData already rendered the real layout
+
+  if (attempt < LAYOUT_POLL_MAX_TRIES) {
+    layoutPollTimer = setTimeout(() => pollForNewLayout(windowKey, attempt + 1), LAYOUT_POLL_INTERVAL_MS);
+  } else {
+    console.warn('Gave up waiting for the new daily seed after 6 minutes — will pick it up on next manual refresh.');
   }
 }
 
@@ -1688,6 +1885,10 @@ function renderLayout(seed, layout) {
   document.getElementById('layoutParBadge').textContent = layout.totalPar;
   seededPar = layout.totalPar;
 
+  // Real data has arrived — clear out any "waiting for today's data"
+  // placeholder state left over from showLayoutPlaceholder(), if present.
+  clearWaitingBanners();
+
   // Map each course name to its identity color
   const COURSE_COLORS = {
     'Sunshine Glade':    'var(--course-sunshine)',
@@ -1770,7 +1971,7 @@ function initDailyWindow() {
 function updateCountdown() {
   const { endUTC } = getDailyWindow();
   const diff = endUTC - new Date();
-  if (diff <= 0) { initDailyWindow(); return; }
+  if (diff <= 0) { initDailyWindow(); handleDailyReset(); return; }
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
@@ -1782,6 +1983,12 @@ function updateCountdown() {
   document.getElementById('cdM').textContent = pad(m);
   document.getElementById('cdS').textContent = pad(s);
 }
+
+// Mark the current window as already-handled on page load, so a normal
+// mid-day load doesn't spuriously trigger the reset-placeholder logic —
+// handleDailyReset() should only fire when the countdown actually crosses
+// into a NEW window while the page is open.
+dailyResetHandledFor = getDailyWindow().startUTC.getTime();
 
 initDailyWindow();
 updateCountdown();
