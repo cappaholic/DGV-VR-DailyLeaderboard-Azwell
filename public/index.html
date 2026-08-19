@@ -1994,6 +1994,19 @@ initDailyWindow();
 updateCountdown();
 setInterval(updateCountdown, 1000);
 
+// setInterval is throttled by browsers (sometimes to once a minute or
+// less) whenever a tab isn't the active, focused one — meaning the 1s
+// countdown tick above can genuinely miss the exact reset boundary by
+// several minutes if the tab was backgrounded right around reset time.
+// These two listeners re-check the boundary immediately the instant the
+// tab regains visibility/focus, so a backgrounded tab self-corrects the
+// moment someone looks at it again instead of waiting on a throttled
+// timer. updateCountdown() already no-ops safely if nothing has changed.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') updateCountdown();
+});
+window.addEventListener('focus', updateCountdown);
+
 // ═══════════════════════════════════════════════════════════════════
 //  Auth
 // ═══════════════════════════════════════════════════════════════════
@@ -2466,16 +2479,48 @@ async function fetchAll(token) {
     // 1. Auth
     accessToken = await exchangeToken(token);
 
-    // 2. Fetch seed → generate layout
+    // Load yesterday's snapshot first — its seed is the one reliable,
+    // stateless way to tell whether "today's" seed the API just gave us
+    // is genuinely fresh, or is still yesterday's value because the game
+    // server hasn't rotated it yet. This matters on a fresh page load
+    // (including repeated manual reloads) specifically because there's
+    // no previously-loaded todaySeed in memory yet to compare against —
+    // unlike syncTodayData(), which always has that baseline.
+    await loadYesterdaySnapshot();
+
+    // 2. Fetch seed → generate layout (unless it's still stale)
+    let seed = null;
+    let seedIsStale = false;
     try {
-      const seed   = await fetchDailySeed(accessToken);
-      const layout = generateLayout(seed);
-      renderLayout(seed, layout);
-      seededPar   = layout.totalPar;
-      todaySeed   = seed;
-      todayLayout = layout;
+      seed = await fetchDailySeed(accessToken);
+      seedIsStale = !!(yesterdaySnapshot && yesterdaySnapshot.seed === seed);
+      if (!seedIsStale) {
+        const layout = generateLayout(seed);
+        renderLayout(seed, layout);
+        seededPar   = layout.totalPar;
+        todaySeed   = seed;
+        todayLayout = layout;
+      }
     } catch(seedErr) {
       console.warn('Seed fetch failed:', seedErr.message);
+    }
+
+    if (seedIsStale) {
+      // We're past the reset boundary but the game hasn't published
+      // today's real layout yet — force the "waiting" state rather than
+      // trusting whatever the scores API currently returns (which may
+      // still reflect the previous day too), and start polling in the
+      // background for the real data to show up.
+      showLayoutPlaceholder();
+      document.getElementById('lbRows').innerHTML = '';
+      document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyStateMsg').textContent = 'New day started — waiting for today\'s layout...';
+      document.getElementById('leaderboardSection').style.display = 'block';
+      updateYesterdayBtn();
+      dailyResetHandledFor = getDailyWindow().startUTC.getTime();
+      pollForNewLayout(dailyResetHandledFor, 0);
+      return;
     }
 
     // 3. Fetch all leaderboard scores
