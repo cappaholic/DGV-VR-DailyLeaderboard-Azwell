@@ -1405,7 +1405,13 @@ function showTodayLeaderboard() {
   document.getElementById('scorecardSection').classList.remove('yesterday-mode');
   const vsParHeader = document.getElementById('vsParHeader');
   if (vsParHeader) vsParHeader.textContent = 'VS Par';
-  if (seededPar && todaySeed && todayLayout) {
+  if (isWaitingForNewLayout) {
+    // Still waiting on today's real layout — re-apply the placeholder
+    // instead of blindly re-rendering the stale cached todaySeed/
+    // todayLayout, which would show yesterday's layout with none of the
+    // dimming/banner that's supposed to signal it's not live yet.
+    showLayoutPlaceholder();
+  } else if (seededPar && todaySeed && todayLayout) {
     renderLayout(todaySeed, todayLayout);
   }
   updateYesterdayBtn();
@@ -1530,6 +1536,7 @@ async function syncTodayData() {
       seededPar   = layout.totalPar;
       todaySeed   = currentSeed;
       todayLayout = layout;
+      isWaitingForNewLayout = false; // confirmed fresh — stop gating scores too
       // The daily reset also means yesterday.json now points to a new
       // day — re-fetch it so the "Yesterday's Leaderboard" button shows
       // the day that just ended, not the one before it.
@@ -1538,6 +1545,14 @@ async function syncTodayData() {
   } catch (seedErr) {
     console.warn('Seed check failed during sync:', seedErr.message);
   }
+
+  // Still waiting on a confirmed-fresh seed for today (whether this call
+  // came from the background poll or a manual Refresh click) — don't
+  // trust or render whatever the scores API currently returns, since it
+  // may still reflect the previous day too, independent of the seed lag.
+  // Leave the reset/placeholder state exactly as handleDailyReset() set
+  // it rather than risk showing stale scores.
+  if (isWaitingForNewLayout) return;
 
   const first = await fetchScoresPage(accessToken, 0, 100);
   totalScores = first.total || (first.results || []).length;
@@ -1611,6 +1626,16 @@ async function refreshLeaderboardOnly() {
 //      actually available — no manual refresh needed
 // ═══════════════════════════════════════════════════════════════════
 let dailyResetHandledFor = null; // startUTC timestamp of the window we've already handled
+
+// Centralized gate: true from the moment we detect the reset boundary
+// until a genuinely new (non-stale) seed is confirmed. EVERY function that
+// renders layout or scores from cached state or a live fetch must check
+// this before trusting/displaying anything — this replaced a series of
+// one-off staleness checks added to individual functions (fetchAll,
+// syncTodayData) after each was found, one at a time, to have its own
+// unguarded path that could undo the reset placeholder. Centralizing this
+// as a single flag every path respects avoids that whack-a-mole pattern.
+let isWaitingForNewLayout = false;
 let layoutPollTimer      = null;
 
 function showLayoutPlaceholder() {
@@ -1699,6 +1724,7 @@ function handleDailyReset() {
   const windowKey = startUTC.getTime();
   if (dailyResetHandledFor === windowKey) return; // already handled this window
   dailyResetHandledFor = windowKey;
+  isWaitingForNewLayout = true;
   if (layoutPollTimer) { clearTimeout(layoutPollTimer); layoutPollTimer = null; }
 
   console.log('Daily reset boundary crossed — resetting today\'s view and watching for the new layout.');
@@ -1872,6 +1898,11 @@ function toggleDistUnit() {
   if (viewingYesterday && yesterdaySnapshot && yesterdaySnapshot.seed) {
     const yLayout = generateLayout(yesterdaySnapshot.seed);
     renderLayout(yesterdaySnapshot.seed, yLayout);
+  } else if (isWaitingForNewLayout) {
+    // Still waiting on today's real layout — re-apply the placeholder
+    // (which itself reads the new distUnit) rather than showing stale
+    // cached layout with no indication it's not live yet.
+    showLayoutPlaceholder();
   } else if (todaySeed && todayLayout) {
     renderLayout(todaySeed, todayLayout);
   }
@@ -2434,6 +2465,13 @@ function renderHistoryContent(playerName, days) {
 // Refreshes only the leaderboard rows — skips re-auth and layout re-render.
 // Used when returning from yesterday's view since we already have a valid token.
 async function fetchScoresOnly(token) {
+  // Still waiting on a confirmed-fresh seed for today — don't trust or
+  // render whatever the scores API currently returns (see syncTodayData
+  // for the full explanation). Leave the reset/placeholder state as-is;
+  // the background poll started by handleDailyReset()/fetchAll() will
+  // pick up real data once it's actually available.
+  if (isWaitingForNewLayout) return;
+
   try {
     const first = await fetchScoresPage(token, 0, 100);
     totalScores = first.total || (first.results || []).length;
@@ -2500,6 +2538,7 @@ async function fetchAll(token) {
         seededPar   = layout.totalPar;
         todaySeed   = seed;
         todayLayout = layout;
+        isWaitingForNewLayout = false;
       }
     } catch(seedErr) {
       console.warn('Seed fetch failed:', seedErr.message);
@@ -2511,6 +2550,7 @@ async function fetchAll(token) {
       // trusting whatever the scores API currently returns (which may
       // still reflect the previous day too), and start polling in the
       // background for the real data to show up.
+      isWaitingForNewLayout = true;
       showLayoutPlaceholder();
       document.getElementById('lbRows').innerHTML = '';
       document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
