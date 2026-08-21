@@ -1537,6 +1537,7 @@ async function syncTodayData() {
       todaySeed   = currentSeed;
       todayLayout = layout;
       isWaitingForNewLayout = false; // confirmed fresh — stop gating scores too
+      persistSeedRecord(currentSeed);
       // The daily reset also means yesterday.json now points to a new
       // day — re-fetch it so the "Yesterday's Leaderboard" button shows
       // the day that just ended, not the one before it.
@@ -1983,6 +1984,33 @@ function renderLayout(seed, layout) {
 //  Countdown + daily window
 //  Reset boundary defined by RESET_HOUR_UTC above.
 // ═══════════════════════════════════════════════════════════════════
+// Second, independent staleness signal alongside the yesterday.json
+// comparison — persists the last-confirmed-fresh seed (and which daily
+// window it belonged to) in localStorage, surviving across page reloads
+// unlike the in-memory todaySeed variable. This doesn't depend on the
+// nightly snapshot cron job having already run/succeeded, so it still
+// catches staleness even if yesterday.json is itself late or unavailable.
+const SEED_STORAGE_KEY = 'dgvr_last_known_seed';
+
+function getPersistedSeedRecord() {
+  try {
+    const raw = localStorage.getItem(SEED_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null; // localStorage unavailable (private browsing, etc.)
+  }
+}
+
+function persistSeedRecord(seed) {
+  try {
+    const windowKey = getDailyWindow().startUTC.getTime();
+    localStorage.setItem(SEED_STORAGE_KEY, JSON.stringify({ seed, windowKey }));
+  } catch (e) {
+    // Silently skip — the yesterday.json-based check still provides
+    // staleness detection on its own.
+  }
+}
+
 function getDailyWindow() {
   const now = new Date();
   // Find the most recent 01:00 UTC at or before now
@@ -2531,7 +2559,11 @@ async function fetchAll(token) {
     let seedIsStale = false;
     try {
       seed = await fetchDailySeed(accessToken);
-      seedIsStale = !!(yesterdaySnapshot && yesterdaySnapshot.seed === seed);
+      const currentWindowKey = getDailyWindow().startUTC.getTime();
+      const persisted = getPersistedSeedRecord();
+      const staleViaYesterday = !!(yesterdaySnapshot && yesterdaySnapshot.seed === seed);
+      const staleViaPersisted = !!(persisted && persisted.windowKey !== currentWindowKey && persisted.seed === seed);
+      seedIsStale = staleViaYesterday || staleViaPersisted;
       if (!seedIsStale) {
         const layout = generateLayout(seed);
         renderLayout(seed, layout);
@@ -2539,6 +2571,7 @@ async function fetchAll(token) {
         todaySeed   = seed;
         todayLayout = layout;
         isWaitingForNewLayout = false;
+        persistSeedRecord(seed);
       }
     } catch(seedErr) {
       console.warn('Seed fetch failed:', seedErr.message);
