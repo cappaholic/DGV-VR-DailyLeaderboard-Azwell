@@ -347,15 +347,33 @@ def load_previously_graduated(path: Path) -> set:
         return set()
 
 
+def load_previous_ratings(path: Path) -> dict:
+    """
+    Each player's rating from the last ratings.json run, used to compute
+    this week's point change (displayed as "(+4)"/"(-3)"/"(0)" on the
+    site). Same read-before-overwrite pattern as load_previously_graduated
+    — reads the file this run is about to replace. Returns {} on the
+    very first run, or if a player is new (no prior rating to compare).
+    """
+    try:
+        data = json.loads(path.read_text())
+        players = data.get('players', {})
+        return {name: d.get('rating') for name, d in players.items() if 'rating' in d}
+    except Exception:
+        return {}
+
+
 def main():
     print(f"[{datetime.now(timezone.utc).isoformat()}] DGV VR Rating Calculator (v2) starting...")
 
     history_all      = json.loads(HISTORY_FILE.read_text())
     flagged          = load_flagged(FLAGGED_FILE)
     graduated        = load_previously_graduated(RATINGS_FILE)
+    previous_ratings = load_previous_ratings(RATINGS_FILE)
     print(f"  History days (total):           {len(history_all)}")
     print(f"  Flagged players:                {len(flagged)}")
     print(f"  Previously graduated players:   {len(graduated)}")
+    print(f"  Players with a previous rating: {len(previous_ratings)}")
 
     history = [d for d in history_all if d['date'] >= DATA_CUTOFF_DATE]
     print(f"  History days (post-cutoff):     {len(history)}")
@@ -400,6 +418,9 @@ def main():
             is_provisional = False
         d["provisional"] = is_provisional
 
+        prev_rating = previous_ratings.get(name)
+        d["change"] = (d["rating"] - prev_rating) if prev_rating is not None else None
+
     players_sorted = dict(
         sorted(players_out.items(), key=lambda x: x[1]['rating'], reverse=True)
     )
@@ -420,7 +441,8 @@ def main():
     print(f"  Top 5:")
     for i, (name, d) in enumerate(list(players_sorted.items())[:5]):
         prov = " (provisional)" if d["provisional"] else ""
-        print(f"    {i+1}. {name}: {d['rating']}{prov}")
+        chg  = f" ({'+' if d['change'] > 0 else ''}{d['change']})" if d['change'] is not None else " (new)"
+        print(f"    {i+1}. {name}: {d['rating']}{chg}{prov}")
     print("Done.")
 
 
