@@ -2332,7 +2332,7 @@ function renderHistoryContent(playerName, days) {
         <div class="history-stat-row dgv-rating-row">
           <div class="history-stat" style="flex:1;">
             <span class="history-stat-label">DGV VR Rating</span>
-            <span class="history-stat-value even" style="font-size:32px;">${rating}</span>
+            <span class="history-stat-value even" style="font-size:32px;">${rating}${playerRatingData.isLive ? '' : formatRatingChangeHtml(playerRatingData.change)}</span>
             ${provBadge}
           </div>
           <div class="history-stat-col" style="gap:6px;">
@@ -3503,6 +3503,24 @@ function getPlayerRating(playerName) {
 // brand-new player who hasn't been through a Sunday calculation yet — using
 // the same SSA formula as the backend. Always marked provisional, mirroring
 // PDGA's "Preliminary Rating" shown before a player's first Official Update.
+// Formats a week-over-week rating change as "(+4)"/"(-3)"/"(0)" — the
+// parentheses are always white; the number inside is green for a gain,
+// red for a loss (same exact colors as the leaderboard's under/over-par
+// styling: #5aad3c / var(--red)), or white for no change. Returns '' if
+// there's no previous rating to compare against (new player, or the
+// live/provisional estimate path, which has no persisted history).
+function formatRatingChangeHtml(change) {
+  if (change === null || change === undefined) return '';
+  const white = 'var(--white)';
+  const green = '#5aad3c';
+  const red   = 'var(--red)';
+  let numStr, color;
+  if (change > 0)      { numStr = '+' + change; color = green; }
+  else if (change < 0) { numStr = String(change); color = red; } // already carries its own minus sign
+  else                  { numStr = '0'; color = white; }
+  return ` <span style="font-size:18px;color:${white};">(</span><span style="font-size:18px;color:${color};">${numStr}</span><span style="font-size:18px;color:${white};">)</span>`;
+}
+
 function getPlayerRatingDisplay(playerName) {
   const official = getPlayerRating(playerName);
   if (official) return { ...official, isLive: false };
