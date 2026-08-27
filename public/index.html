@@ -426,7 +426,7 @@
     background: var(--card); border: 1px solid var(--border);
     border-top: 2px solid var(--accent2);
     border-radius: 10px; padding: 24px 28px;
-    width: 420px; max-width: 94vw;
+    width: 460px; max-width: 94vw;
     max-height: 85vh; display: flex; flex-direction: column;
     font-family: 'DM Mono', monospace;
   }
@@ -448,7 +448,7 @@
   }
   .top50-row {
     display: grid;
-    grid-template-columns: 36px 1fr 70px;
+    grid-template-columns: 36px 1fr 70px 55px;
     column-gap: 10px;
     align-items: center;
     padding: 9px 14px 9px 4px;
@@ -474,9 +474,13 @@
     font-size: 16px; font-weight: 400; color: var(--white);
     text-align: right; margin-right: 2px;
   }
+  .top50-change {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px; text-align: right;
+  }
   .top50-header-row {
     display: grid;
-    grid-template-columns: 36px 1fr 70px;
+    grid-template-columns: 36px 1fr 70px 55px;
     column-gap: 10px;
     padding: 0 14px 10px 4px;
     border-bottom: 1px solid var(--border);
@@ -489,6 +493,7 @@
     text-transform: uppercase;
   }
   .top50-header-row span:nth-child(3) { text-align: right; }
+  .top50-header-row span:nth-child(4) { text-align: right; }
   .top50-close-btn {
     margin-top: 16px; width: auto; align-self: center;
     background: transparent; border: 1px solid var(--border);
@@ -2764,6 +2769,7 @@ function renderTop50List() {
       <span style="text-align:center;">Rank</span>
       <span>Player</span>
       <span>Rating</span>
+      <span>Change</span>
     </div>`;
 
   let html = HEADER_ROW_HTML;
@@ -2774,6 +2780,7 @@ function renderTop50List() {
         <div class="top50-rank ${rankCls}">${rank}</div>
         <div class="top50-name">${escapeHtml(name)}</div>
         <div class="top50-rating">${d.rating}</div>
+        <div class="top50-change">${formatTop50ChangeHtml(d.change)}</div>
       </div>`;
   }
 
@@ -2785,10 +2792,30 @@ function renderTop50List() {
         <div class="top50-rank">${p}</div>
         <div class="top50-name" style="color:var(--muted);font-style:italic;font-size:12px;">Not Enough Players</div>
         <div class="top50-rating" style="color:var(--muted);">N/A</div>
+        <div class="top50-change" style="color:var(--muted);">—</div>
       </div>`;
   }
 
   container.innerHTML = html;
+}
+
+// Renders a player's weekly rating change for the Top 50 leaderboard's
+// "Change" column — no parentheses here (unlike the player popup), just
+// the signed number itself, colored the same green/red/white as the
+// leaderboard's vs-par styling. Shows an em dash for new players with
+// no previous rating to compare against.
+function formatTop50ChangeHtml(change) {
+  if (change === null || change === undefined) {
+    return `<span style="color:var(--muted);">—</span>`;
+  }
+  const white = 'var(--white)';
+  const green = '#5aad3c';
+  const red   = 'var(--red)';
+  let numStr, color;
+  if (change > 0)      { numStr = '+' + change; color = green; }
+  else if (change < 0) { numStr = String(change); color = red; }
+  else                  { numStr = '0'; color = white; }
+  return `<span style="color:${color};">${numStr}</span>`;
 }
 
 // ── Export menu (desktop only) ────────────────────────────────────────
@@ -2812,14 +2839,20 @@ function exportFilenameBase() {
 // placeholders) so exports always exactly match what's on screen.
 function getExportableRows() {
   const rows = Array.from(document.querySelectorAll('#top50List .top50-row:not(.top50-row-placeholder)'));
-  return rows.map(row => ({
-    rank:   row.querySelector('.top50-rank').textContent.trim(),
-    name:   row.querySelector('.top50-name').textContent.trim(),
-    rating: row.querySelector('.top50-rating').textContent.trim(),
-    rankCls: row.querySelector('.top50-rank').classList.contains('top1') ? 'top1'
-           : row.querySelector('.top50-rank').classList.contains('top2') ? 'top2'
-           : row.querySelector('.top50-rank').classList.contains('top3') ? 'top3' : '',
-  }));
+  return rows.map(row => {
+    const changeEl = row.querySelector('.top50-change');
+    const changeText = changeEl ? changeEl.textContent.trim() : '—';
+    return {
+      rank:   row.querySelector('.top50-rank').textContent.trim(),
+      name:   row.querySelector('.top50-name').textContent.trim(),
+      rating: row.querySelector('.top50-rating').textContent.trim(),
+      change: changeText,
+      changeSign: changeText.startsWith('+') ? 'pos' : (changeText.startsWith('-') ? 'neg' : 'none'),
+      rankCls: row.querySelector('.top50-rank').classList.contains('top1') ? 'top1'
+             : row.querySelector('.top50-rank').classList.contains('top2') ? 'top2'
+             : row.querySelector('.top50-rank').classList.contains('top3') ? 'top3' : '',
+    };
+  });
 }
 
 const EXPORT_ROWS_PER_COLUMN = 25;
@@ -2833,19 +2866,28 @@ function rankColor(rankCls) {
 
 function buildColumnHeaderHtml() {
   return `
-    <div style="display:grid;grid-template-columns:28px 1fr 50px;column-gap:8px;padding:0 4px 8px;border-bottom:1px solid #1e3d55;margin-bottom:6px;">
+    <div style="display:grid;grid-template-columns:28px 1fr 50px 50px;column-gap:8px;padding:0 4px 8px;border-bottom:1px solid #1e3d55;margin-bottom:6px;">
       <span style="font-family:'DM Mono',monospace;color:#6e9ab5;font-size:9px;letter-spacing:2px;text-transform:uppercase;">RANK</span>
       <span style="font-family:'DM Mono',monospace;color:#6e9ab5;font-size:9px;letter-spacing:2px;text-transform:uppercase;">PLAYER</span>
       <span style="font-family:'DM Mono',monospace;color:#6e9ab5;font-size:9px;letter-spacing:2px;text-transform:uppercase;text-align:right;">RATING</span>
+      <span style="font-family:'DM Mono',monospace;color:#6e9ab5;font-size:9px;letter-spacing:2px;text-transform:uppercase;text-align:right;">CHANGE</span>
     </div>`;
+}
+
+function changeColor(changeSign) {
+  return changeSign === 'pos' ? '#5aad3c'
+       : changeSign === 'neg' ? '#e05c5c'
+       : changeSign === 'none' ? '#edf6ff'
+       : '#6e9ab5'; // em dash / no data
 }
 
 function buildRowHtml(r) {
   return `
-    <div style="display:grid;grid-template-columns:28px 1fr 50px;column-gap:8px;padding:5px 4px;align-items:center;">
+    <div style="display:grid;grid-template-columns:28px 1fr 50px 50px;column-gap:8px;padding:5px 4px;align-items:center;">
       <span style="font-family:'DM Mono',monospace;color:${rankColor(r.rankCls)};font-size:12px;font-weight:600;text-align:center;">${escapeHtml(r.rank)}</span>
       <span style="font-family:'DM Sans',sans-serif;color:#edf6ff;font-size:14px;word-break:break-word;">${escapeHtml(r.name)}</span>
       <span style="font-family:'DM Mono',monospace;color:#edf6ff;font-size:16px;font-weight:400;text-align:right;">${escapeHtml(r.rating)}</span>
+      <span style="font-family:'DM Mono',monospace;color:${changeColor(r.changeSign)};font-size:13px;text-align:right;">${escapeHtml(r.change)}</span>
     </div>`;
 }
 
@@ -2856,7 +2898,7 @@ function buildRowHtml(r) {
 // as-is (verified working, so left untouched for that common case).
 function buildMultiColumnExportElement(rows, title, subtitle) {
   const numCols = Math.ceil(rows.length / EXPORT_ROWS_PER_COLUMN);
-  const colWidth = 300;
+  const colWidth = 350;
   const gap = 32;
   const totalWidth = numCols * colWidth + (numCols - 1) * gap + 56;
 
@@ -2961,7 +3003,7 @@ function exportTop50AsText() {
 
   let body = '';
   rows.forEach(r => {
-    body += String.raw`\b ${rtfEscape(r.rank)}.\b0  ${rtfEscape(r.name)} - ${rtfEscape(r.rating)}\line` + '\n';
+    body += String.raw`\b ${rtfEscape(r.rank)}.\b0  ${rtfEscape(r.name)} - ${rtfEscape(r.rating)} (${rtfEscape(r.change)})\line` + '\n';
   });
 
   const rtfContent = rtfHeader + body + '\\par}';
@@ -3518,7 +3560,7 @@ function formatRatingChangeHtml(change) {
   if (change > 0)      { numStr = '+' + change; color = green; }
   else if (change < 0) { numStr = String(change); color = red; } // already carries its own minus sign
   else                  { numStr = '0'; color = white; }
-  return ` <span style="font-size:18px;color:${white};">(</span><span style="font-size:18px;color:${color};">${numStr}</span><span style="font-size:18px;color:${white};">)</span>`;
+  return `<span style="font-size:18px;color:${white};margin-left:8px;">(</span><span style="font-size:18px;color:${color};">${numStr}</span><span style="font-size:18px;color:${white};">)</span>`;
 }
 
 function getPlayerRatingDisplay(playerName) {
