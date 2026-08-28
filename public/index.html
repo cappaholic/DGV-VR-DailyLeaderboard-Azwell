@@ -1769,8 +1769,31 @@ async function pollForNewLayout(windowKey, attempt) {
 
   if (attempt < LAYOUT_POLL_MAX_TRIES) {
     layoutPollTimer = setTimeout(() => pollForNewLayout(windowKey, attempt + 1), LAYOUT_POLL_INTERVAL_MS);
-  } else {
-    console.warn('Gave up waiting for the new daily seed after 6 minutes — will pick it up on next manual refresh.');
+    return;
+  }
+
+  // Gave up waiting for a CONFIRMED change after 6 minutes. Continuing to
+  // hide data indefinitely (until the next manual refresh) serves no one
+  // well at this point — accept and render whatever's currently available
+  // instead of leaving the site stuck on the placeholder forever. This
+  // also correctly resolves the "cautious first-time-visitor" case: if
+  // the data had actually been fine the whole time (a false alarm from
+  // isEarlyInCurrentWindow()), this is what finally shows it.
+  console.warn('Gave up waiting for a confirmed new daily seed after 6 minutes — showing current data as-is.');
+  isWaitingForNewLayout = false;
+  try {
+    const layout = generateLayout(todaySeed);
+    renderLayout(todaySeed, layout);
+    seededPar   = layout.totalPar;
+    todayLayout = layout;
+    persistSeedRecord(todaySeed);
+  } catch (err) {
+    console.warn('Failed to render fallback layout after timeout:', err.message);
+  }
+  try {
+    await syncTodayData(); // isWaitingForNewLayout is now false, so this renders scores too
+  } catch (err) {
+    console.warn('Failed to sync scores after timeout:', err.message);
   }
 }
 
@@ -2023,6 +2046,18 @@ function getDailyWindow() {
   const startUTC = (candidate <= now) ? candidate : new Date(candidate.getTime() - 86400000);
   const endUTC   = new Date(startUTC.getTime() + 86400000);
   return { startUTC, endUTC };
+}
+
+// Pure clock check, no external file/API dependency — true for roughly
+// the first 15 minutes of the current daily window. Used as a cautious
+// default for a first-ever visit (no locally-persisted seed record yet)
+// during the highest-risk period right after a reset, when the game
+// server may not have published the new day's data yet.
+const EARLY_WINDOW_MINUTES = 15;
+function isEarlyInCurrentWindow() {
+  const { startUTC } = getDailyWindow();
+  const minutesSinceStart = (new Date() - startUTC) / 60000;
+  return minutesSinceStart >= 0 && minutesSinceStart < EARLY_WINDOW_MINUTES;
 }
 
 function initDailyWindow() {
@@ -2553,25 +2588,43 @@ async function fetchAll(token) {
     // 1. Auth
     accessToken = await exchangeToken(token);
 
-    // Load yesterday's snapshot first — its seed is the one reliable,
-    // stateless way to tell whether "today's" seed the API just gave us
-    // is genuinely fresh, or is still yesterday's value because the game
-    // server hasn't rotated it yet. This matters on a fresh page load
-    // (including repeated manual reloads) specifically because there's
-    // no previously-loaded todaySeed in memory yet to compare against —
-    // unlike syncTodayData(), which always has that baseline.
+    // Still loaded for the "Yesterday's Leaderboard" button/data — but no
+    // longer used to decide staleness (see note below).
     await loadYesterdaySnapshot();
 
     // 2. Fetch seed → generate layout (unless it's still stale)
+    //
+    // Staleness detection is entirely self-contained — it does NOT depend
+    // on yesterday.json. That file is written by a separate GitHub Actions
+    // job and served as a static asset; even when that job runs correctly
+    // and on time (verified), Vercel's edge/CDN caching for static files
+    // can still serve a stale cached copy for a period after the file is
+    // actually updated. Relying on it made the whole reset-detection
+    // system dependent on an external timing/caching guarantee this site
+    // has no real control over. Instead:
+    //   1. Primary check: does our OWN local record (localStorage,
+    //      survives page reloads) show this exact seed already belonged
+    //      to an earlier day? If so, it's definitively stale — this is
+    //      based purely on what the client itself has already verified.
+    //   2. Fallback for a first-ever visit (no local record at all): pure
+    //      clock math — are we still within the first few minutes of the
+    //      current daily window? If so, treat the freshly-fetched seed
+    //      with caution by default rather than trusting it immediately.
+    //      Whatever we fetch here becomes the comparison baseline for the
+    //      background poll (see below) — it only stops waiting once a
+    //      GENUINE change is detected, or the poll times out and accepts
+    //      whatever's current (see pollForNewLayout's timeout handling).
     let seed = null;
     let seedIsStale = false;
     try {
       seed = await fetchDailySeed(accessToken);
       const currentWindowKey = getDailyWindow().startUTC.getTime();
       const persisted = getPersistedSeedRecord();
-      const staleViaYesterday = !!(yesterdaySnapshot && yesterdaySnapshot.seed === seed);
-      const staleViaPersisted = !!(persisted && persisted.windowKey !== currentWindowKey && persisted.seed === seed);
-      seedIsStale = staleViaYesterday || staleViaPersisted;
+
+      const knownStale = !!(persisted && persisted.windowKey !== currentWindowKey && persisted.seed === seed);
+      const noRecordButEarly = !persisted && isEarlyInCurrentWindow();
+
+      seedIsStale = knownStale || noRecordButEarly;
       if (!seedIsStale) {
         const layout = generateLayout(seed);
         renderLayout(seed, layout);
@@ -2586,11 +2639,20 @@ async function fetchAll(token) {
     }
 
     if (seedIsStale) {
-      // We're past the reset boundary but the game hasn't published
-      // today's real layout yet — force the "waiting" state rather than
-      // trusting whatever the scores API currently returns (which may
-      // still reflect the previous day too), and start polling in the
-      // background for the real data to show up.
+      // We're past the reset boundary but can't yet confirm today's real
+      // layout has actually been published — force the "waiting" state
+      // rather than trusting whatever the scores API currently returns
+      // (which may still reflect the previous day too), and start
+      // polling in the background for confirmed-fresh data to show up.
+      //
+      // Critical: set todaySeed to whatever we just fetched (even though
+      // it's presumed stale) so the background poll's "has it changed"
+      // comparison has a real baseline. Without this, todaySeed stays
+      // undefined, and the very next poll would find ANY fetched value
+      // "!== undefined" and wrongly treat it as a confirmed change —
+      // dismissing the placeholder after one 30s cycle regardless of
+      // whether the data had actually changed at all.
+      todaySeed = seed;
       isWaitingForNewLayout = true;
       showLayoutPlaceholder();
       document.getElementById('lbRows').innerHTML = '';
