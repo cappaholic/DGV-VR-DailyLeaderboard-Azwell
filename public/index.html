@@ -476,7 +476,7 @@
   }
   .top50-change {
     font-family: 'DM Mono', monospace;
-    font-size: 13px; text-align: right;
+    font-size: 13px; text-align: center;
   }
   .top50-header-row {
     display: grid;
@@ -493,7 +493,7 @@
     text-transform: uppercase;
   }
   .top50-header-row span:nth-child(3) { text-align: right; }
-  .top50-header-row span:nth-child(4) { text-align: right; }
+  .top50-header-row span:nth-child(4) { text-align: center; }
   .top50-close-btn {
     margin-top: 16px; width: auto; align-self: center;
     background: transparent; border: 1px solid var(--border);
@@ -2337,7 +2337,10 @@ function renderHistoryContent(playerName, days) {
         <div class="history-stat-row dgv-rating-row">
           <div class="history-stat" style="flex:1;">
             <span class="history-stat-label">DGV VR Rating</span>
-            <span class="history-stat-value even" style="font-size:32px;">${rating}${playerRatingData.isLive ? '' : formatRatingChangeHtml(playerRatingData.change)}</span>
+            <div style="display:flex; align-items:baseline; justify-content:center; gap:8px;">
+              <span class="history-stat-value even" style="font-size:32px;">${rating}</span>
+              ${playerRatingData.isLive ? '' : formatRatingChangeHtml(playerRatingData.change)}
+            </div>
             ${provBadge}
           </div>
           <div class="history-stat-col" style="gap:6px;">
@@ -3560,7 +3563,7 @@ function formatRatingChangeHtml(change) {
   if (change > 0)      { numStr = '+' + change; color = green; }
   else if (change < 0) { numStr = String(change); color = red; } // already carries its own minus sign
   else                  { numStr = '0'; color = white; }
-  return `<span style="font-size:18px;color:${white};margin-left:8px;">(</span><span style="font-size:18px;color:${color};">${numStr}</span><span style="font-size:18px;color:${white};">)</span>`;
+  return `<span style="font-size:18px;line-height:1;"><span style="color:${white};">(</span><span style="color:${color};">${numStr}</span><span style="color:${white};">)</span></span>`;
 }
 
 function getPlayerRatingDisplay(playerName) {
