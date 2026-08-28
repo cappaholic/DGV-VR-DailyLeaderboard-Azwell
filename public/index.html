@@ -448,7 +448,7 @@
   }
   .top50-row {
     display: grid;
-    grid-template-columns: 36px 1fr 70px 70px;
+    grid-template-columns: 36px 1fr 60px 62px;
     column-gap: 10px;
     align-items: center;
     padding: 9px 10px 9px 4px;
@@ -472,7 +472,7 @@
   }
   .top50-rating {
     font-size: 16px; font-weight: 400; color: var(--white);
-    text-align: right;
+    text-align: center;
   }
   .top50-change {
     font-family: 'DM Mono', monospace;
@@ -480,7 +480,7 @@
   }
   .top50-header-row {
     display: grid;
-    grid-template-columns: 36px 1fr 70px 70px;
+    grid-template-columns: 36px 1fr 60px 62px;
     column-gap: 10px;
     padding: 0 10px 10px 4px;
     border-bottom: 1px solid var(--border);
@@ -492,8 +492,8 @@
     font-size: 9px; letter-spacing: 2px; color: var(--muted);
     text-transform: uppercase;
   }
-  .top50-header-row span:nth-child(3) { text-align: right; }
-  .top50-header-row span:nth-child(4) { text-align: center; }
+  .top50-header-row span:nth-child(3) { text-align: center; }
+  .top50-header-row span:nth-child(4) { text-align: center; letter-spacing: 1px; }
   .top50-close-btn {
     margin-top: 16px; width: auto; align-self: center;
     background: transparent; border: 1px solid var(--border);
@@ -3563,7 +3563,7 @@ function formatRatingChangeHtml(change) {
   if (change > 0)      { numStr = '+' + change; color = green; }
   else if (change < 0) { numStr = String(change); color = red; } // already carries its own minus sign
   else                  { numStr = '0'; color = white; }
-  return `<span style="font-size:18px;line-height:1;"><span style="color:${white};">(</span><span style="color:${color};">${numStr}</span><span style="color:${white};">)</span></span>`;
+  return `<span style="font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;color:${color};">(${numStr})</span>`;
 }
 
 function getPlayerRatingDisplay(playerName) {
