@@ -2744,7 +2744,8 @@ function renderTop50List() {
   const tier  = total < 20 ? 10 : total < 50 ? 20 : total < 100 ? 50 : 100;
 
   document.querySelector('.top50-title').textContent    = 'DGV VR Ratings';
-  const asOf = ratingsData && ratingsData.generated ? ` · As of ${ratingsData.generated}` : '';
+  const asOfInfo = ratingsData && ratingsData.generated ? formatAsOfLocal(ratingsData.generated) : null;
+  const asOf = asOfInfo ? ` · As of ${asOfInfo.display}` : '';
   document.querySelector('.top50-subtitle').textContent = `Top ${tier} Rankings${asOf}`;
 
   let displayRank  = 0;
@@ -2833,8 +2834,29 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// Converts the "generated" date (a bare UTC calendar date — the Sunday
+// whose reset triggered the weekly calculation) into the VISITOR's own
+// local calendar date, matching the same convention already used for
+// "Today's Challenge Window" (browser default local time, no explicit
+// timeZone). The instant this date represents is midnight UTC at the END
+// of that Sunday — i.e. the moment it rolled into Monday and triggered
+// the calculation — so we convert the START of the next UTC day, not the
+// date string itself. Like the challenge window, this can show a
+// different calendar day to visitors in different timezones for the
+// exact same calculation — same shared instant, everyone sees their own
+// local representation of it.
+function formatAsOfLocal(generatedDateStr) {
+  if (!generatedDateStr) return null;
+  const boundary = new Date(generatedDateStr + 'T00:00:00Z');
+  boundary.setUTCDate(boundary.getUTCDate() + 1);
+  const display = boundary.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+  const ymd = boundary.getFullYear() + '-' + String(boundary.getMonth() + 1).padStart(2, '0') + '-' + String(boundary.getDate()).padStart(2, '0');
+  return { display, ymd };
+}
+
 function exportFilenameBase() {
-  const dateStr = (ratingsData && ratingsData.generated) || new Date().toISOString().slice(0, 10);
+  const asOfInfo = ratingsData && ratingsData.generated ? formatAsOfLocal(ratingsData.generated) : null;
+  const dateStr = asOfInfo ? asOfInfo.ymd : new Date().toISOString().slice(0, 10);
   return `DGV_VR_Ratings_${dateStr}`;
 }
 
