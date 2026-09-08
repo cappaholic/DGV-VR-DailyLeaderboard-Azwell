@@ -425,8 +425,18 @@ def main():
         sorted(players_out.items(), key=lambda x: x[1]['rating'], reverse=True)
     )
 
+    # "generated" is the date the ratings are AS OF — i.e. the Sunday whose
+    # reset triggered this calculation — not the wall-clock date the script
+    # happened to execute on. If the workflow runs late (GitHub's own cron
+    # scheduling has been observed running hours late), datetime.now() could
+    # already show Monday even though the ratings represent Sunday's data.
+    # Using the last real date in the post-cutoff history is correct
+    # regardless of exactly when the script runs relative to midnight UTC.
+    as_of_date = history[-1]['date']
+    print(f"  As-of date (real last day in history): {as_of_date}")
+
     output = {
-        "generated":      datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "generated":      as_of_date,
         "generated_ts":   datetime.now(timezone.utc).isoformat(),
         "cutoff_date":    DATA_CUTOFF_DATE,
         "method":         "SSA-anchored, PDGA-style compression — no par anchor",
