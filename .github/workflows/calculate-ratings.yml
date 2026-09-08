@@ -49,7 +49,7 @@ jobs:
         run: |
           FORCE="${{ github.event.inputs.force }}"
           if [ "$FORCE" = "true" ]; then
-            echo "Forced run — skipping day check."
+            echo "Forced run — skipping day check and already-done check."
             echo "proceed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -63,12 +63,35 @@ jobs:
 
           WEEKDAY=$(date -u -d "$LAST_DATE" +%u)   # 1=Mon ... 7=Sun
           echo "Most recent snapshot date: $LAST_DATE (ISO weekday $WEEKDAY)"
-          if [ "$WEEKDAY" = "7" ]; then
-            echo "This is a Sunday snapshot — proceeding."
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          else
+          if [ "$WEEKDAY" != "7" ]; then
             echo "Not a Sunday snapshot — skipping ratings calculation."
             echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Second condition, closing the gap that previously let two
+          # separate triggers (the workflow_run chain AND the cron
+          # fallback) both fire for the SAME Sunday: checking "is this a
+          # Sunday" alone isn't enough, since history.json's last date
+          # stays that same Sunday all the way until the NEXT day's
+          # snapshot runs. Whichever trigger fires first for a given
+          # Sunday does the real work; a redundant second trigger must
+          # see "already handled" and skip, regardless of which trigger
+          # fired first.
+          ALREADY_DONE=$(python3 -c "
+          import json
+          try:
+              r = json.load(open('public/ratings.json'))
+              print('yes' if r.get('generated') == '$LAST_DATE' else 'no')
+          except Exception:
+              print('no')
+          ")
+          if [ "$ALREADY_DONE" = "yes" ]; then
+            echo "ratings.json is already calculated for $LAST_DATE — skipping duplicate run."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "This is a Sunday snapshot not yet calculated — proceeding."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run rating calculator
