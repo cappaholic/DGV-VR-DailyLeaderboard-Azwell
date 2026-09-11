@@ -415,6 +415,38 @@
       text-align: center;
       text-transform: uppercase;
     }
+    /* Waiting state that keeps the actual (stale) hole photo visible,
+       faded, with a bold overlay label — used once we have a real prior
+       layout to show underneath, rather than an empty bordered box. */
+    .side-hole-photo-wrap {
+      position: relative;
+      width: 100%;
+      flex-shrink: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .side-hole-img-faded {
+      opacity: 0.18;
+    }
+    .side-hole-waiting-overlay {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      padding: 0 6px;
+      box-sizing: border-box;
+      font-family: 'Bebas Neue', Impact, sans-serif;
+      font-weight: 700;
+      font-size: 25px;
+      line-height: 1.15;
+      letter-spacing: 3px;
+      color: #debc3e;
+      text-align: center;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
   }
   .top50-overlay {
     display: none; position: fixed; inset: 0;
@@ -1411,10 +1443,16 @@ function showTodayLeaderboard() {
   const vsParHeader = document.getElementById('vsParHeader');
   if (vsParHeader) vsParHeader.textContent = 'VS Par';
   if (isWaitingForNewLayout) {
-    // Still waiting on today's real layout — re-apply the placeholder
-    // instead of blindly re-rendering the stale cached todaySeed/
-    // todayLayout, which would show yesterday's layout with none of the
-    // dimming/banner that's supposed to signal it's not live yet.
+    // Re-establish TODAY's own last-known (stale) content first, in case
+    // the shared courses/layout elements currently show YESTERDAY's data
+    // instead (e.g. the user just switched back from viewing Yesterday's
+    // Leaderboard) — otherwise showLayoutPlaceholder()'s dimming/banner
+    // would be applied on top of yesterday's content, mislabeling it as
+    // "today, waiting" instead of leaving it correctly showing today's
+    // actual (if stale) last-known layout underneath the placeholder.
+    if (todaySeed && todayLayout) {
+      renderLayout(todaySeed, todayLayout);
+    }
     showLayoutPlaceholder();
   } else if (seededPar && todaySeed && todayLayout) {
     renderLayout(todaySeed, todayLayout);
@@ -1690,8 +1728,9 @@ function clearWaitingBanners() {
 
 // Individual hole-photo placeholder — thin uniform border (matching the
 // side title box's top/bottom edge style, not its yellow side accent),
-// two-line "waiting" text in that same yellow. The "Hole N" caption below
-// stays as normal; par/distance show as dashes since they're unknown yet.
+// two-line "waiting" text in that same yellow. Used only as a fallback
+// when there's no real prior layout at all to show a photo for (e.g. a
+// genuinely first-ever load with nothing cached yet).
 function sideHolePlaceholderHtml(holeNum) {
   const unitLabel = distUnit === 'm' ? 'M' : 'FT';
   return `
@@ -1707,20 +1746,54 @@ function sideHolePlaceholderHtml(holeNum) {
     </div>`;
 }
 
+// Preferred waiting state: keeps the actual last-known (stale) hole photo
+// visible, faded, with "WAITING FOR TODAY'S DATA" overlaid in the same
+// bold font/size as the "TODAY'S LAYOUT" title box, in the established
+// yellow. The label below still shows the real (stale) par/distance,
+// consistent with how the courses/layout rows keep their real content
+// visible-but-dimmed rather than blanking it out.
+function sideHolePlaceholderOverlayHtml(h) {
+  return `
+    <div class="side-hole-pip">
+      <div class="side-hole-photo-wrap">
+        <img class="side-hole-img side-hole-img-faded" style="--hole-color:${h.color}" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
+        <div class="side-hole-waiting-overlay">Waiting for<br>Today's Data</div>
+      </div>
+      <div class="side-hole-label">
+        <span class="side-hole-label-item">Hole <span class="side-hole-label-white">${h.layoutHole}</span></span>
+        <span class="side-hole-label-item">PAR ${h.par}</span>
+        <span class="side-hole-label-item">${h.dist}</span>
+      </div>
+    </div>`;
+}
+
 function showSidePanelsPlaceholder() {
   if (window.innerWidth < 1200) return; // desktop only, same guard as startSidePanels
   // spL0 (the "Today's Layout" title box) is intentionally left untouched.
   const leftIds  = ['spL1','spL2','spL3','spL4'];
   const rightIds = ['spR0','spR1','spR2','spR3','spR4'];
+
+  // Use the real last-known (stale) hole data when we have it, so the
+  // actual photo/par/distance shows underneath the faded overlay instead
+  // of an empty bordered box — falls back to the plain placeholder only
+  // if there's truly no prior layout cached yet (first-ever load).
+  const staleHoles = buildSidePanelHoles(todayLayout);
+
   let holeNum = 1;
   leftIds.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = sideHolePlaceholderHtml(holeNum);
+    if (el) {
+      const h = staleHoles[holeNum - 1];
+      el.innerHTML = h ? sideHolePlaceholderOverlayHtml(h) : sideHolePlaceholderHtml(holeNum);
+    }
     holeNum++;
   });
   rightIds.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = sideHolePlaceholderHtml(holeNum);
+    if (el) {
+      const h = staleHoles[holeNum - 1];
+      el.innerHTML = h ? sideHolePlaceholderOverlayHtml(h) : sideHolePlaceholderHtml(holeNum);
+    }
     holeNum++;
   });
 }
@@ -1928,9 +2001,12 @@ function toggleDistUnit() {
     const yLayout = generateLayout(yesterdaySnapshot.seed);
     renderLayout(yesterdaySnapshot.seed, yLayout);
   } else if (isWaitingForNewLayout) {
-    // Still waiting on today's real layout — re-apply the placeholder
-    // (which itself reads the new distUnit) rather than showing stale
-    // cached layout with no indication it's not live yet.
+    // Re-establish today's own last-known content first (see
+    // showTodayLeaderboard for the full explanation), then re-apply the
+    // placeholder dimming/banner on top of it with the new distUnit.
+    if (todaySeed && todayLayout) {
+      renderLayout(todaySeed, todayLayout);
+    }
     showLayoutPlaceholder();
   } else if (todaySeed && todayLayout) {
     renderLayout(todaySeed, todayLayout);
