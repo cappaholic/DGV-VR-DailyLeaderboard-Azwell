@@ -2852,7 +2852,7 @@ function renderTop50List() {
   // earned). Provisional and leaderboard eligibility are the same gate again
   // now that "provisional" is round-count-based — see calculate_ratings.py.
   const allSorted = Object.entries(allRatings)
-    .filter(([, d]) => !d.provisional)
+    .filter(([name, d]) => !d.provisional && !RATINGS_LEADERBOARD_HIDDEN_NAMES.includes(name))
     .sort((a, b) => b[1].rating - a[1].rating);
 
   // Minimum 10 eligible players before showing the leaderboard at all.
@@ -3685,6 +3685,18 @@ function stopSidePanels() {
 // ═══════════════════════════════════════════════════════════════════
 let ratingsData   = null;   // parsed ratings.json: { generated, players: {...} }
 let ratingsLoaded = false;
+
+// Display-only exclusion list for the DGV VR Ratings leaderboard (top50
+// modal + its exports). Use this for known duplicate/renamed accounts —
+// e.g. a player who changed their in-game name, so their OLD name is
+// still sitting in ratings.json as a separate row alongside their NEW
+// one. This does NOT touch calculate_ratings.py, flagged.json, or any
+// backend math — the hidden name's rounds still count normally toward
+// SSA/propagator calculations for everyone else. It only removes that
+// name from what's rendered here, so ranks below it shift up by one as
+// if the duplicate row didn't exist. Remove a name from this list (or
+// clear it entirely) to un-hide it at any time.
+const RATINGS_LEADERBOARD_HIDDEN_NAMES = ['Supreme.Worm'];
 
 async function loadRatingsData() {
   try {
