@@ -137,6 +137,21 @@
     white-space: nowrap;
     pointer-events: none;
   }
+  /* On mobile the absolutely-centered banner collides with the "Today's
+     Courses"/"Today's Layout" label sitting next to it in the same row.
+     Drop it into normal flow as a full-width line instead — the row is
+     already flex-wrap, so it wraps cleanly onto its own line below. */
+  @media (max-width: 600px) {
+    .layout-waiting-banner {
+      position: static;
+      transform: none;
+      display: block;
+      width: 100%;
+      text-align: center;
+      white-space: normal;
+      margin-top: 6px;
+    }
+  }
   .courses-row.stale-data, .scorecard-row.stale-data {
     opacity: 0.35;
   }
@@ -397,8 +412,13 @@
     .side-hole-label-item { white-space: nowrap; }
     .side-hole-label-white { color: var(--white); }
     .side-hole-placeholder-box {
-      flex: 1 1 auto;
+      /* Sized to match the footprint a real hole photo would occupy
+         (same 16:9 aspect ratio used elsewhere for hole images) instead
+         of stretching to fill the whole section — otherwise this box is
+         visibly taller than every other (real-photo) box in the panel. */
       width: 100%;
+      aspect-ratio: 16 / 9;
+      flex-shrink: 1;
       min-height: 0;
       box-sizing: border-box;
       border: 1px solid var(--border);
@@ -1443,16 +1463,12 @@ function showTodayLeaderboard() {
   const vsParHeader = document.getElementById('vsParHeader');
   if (vsParHeader) vsParHeader.textContent = 'VS Par';
   if (isWaitingForNewLayout) {
-    // Re-establish TODAY's own last-known (stale) content first, in case
-    // the shared courses/layout elements currently show YESTERDAY's data
-    // instead (e.g. the user just switched back from viewing Yesterday's
-    // Leaderboard) — otherwise showLayoutPlaceholder()'s dimming/banner
-    // would be applied on top of yesterday's content, mislabeling it as
-    // "today, waiting" instead of leaving it correctly showing today's
-    // actual (if stale) last-known layout underneath the placeholder.
-    if (todaySeed && todayLayout) {
-      renderLayout(todaySeed, todayLayout);
-    }
+    // showLayoutPlaceholder() now picks its own reference layout (today's
+    // last-known stale one if this session has it, otherwise yesterday's
+    // snapshot) and (re)populates the courses/scorecard/side-panel content
+    // from it before dimming — so switching back from Yesterday's view
+    // while still waiting looks identical to a fresh, first-ever visit
+    // during the same waiting window. No separate pre-render needed here.
     showLayoutPlaceholder();
   } else if (seededPar && todaySeed && todayLayout) {
     renderLayout(todaySeed, todayLayout);
@@ -1666,7 +1682,7 @@ async function refreshLeaderboardOnly() {
 //      continuing to display the now-stale previous layout
 //    - yesterday.json is re-fetched right away
 //    - A bounded background poll checks for the real new seed every 30s
-//      for up to ~6 minutes, swapping in the real layout the moment it's
+//      for up to ~20 minutes, swapping in the real layout the moment it's
 //      actually available — no manual refresh needed
 // ═══════════════════════════════════════════════════════════════════
 let dailyResetHandledFor = null; // startUTC timestamp of the window we've already handled
@@ -1682,6 +1698,22 @@ let dailyResetHandledFor = null; // startUTC timestamp of the window we've alrea
 let isWaitingForNewLayout = false;
 let layoutPollTimer      = null;
 
+// Best available layout to show (dimmed) underneath the "waiting for
+// today's data" state: today's own last-known layout if this session
+// already has one cached (e.g. the reset happened while the page was
+// open), otherwise yesterday's snapshot layout — this covers a fresh,
+// first-ever visit during the waiting window, so it still shows a real,
+// fully-populated course/scorecard/hole-photo layout dimmed underneath
+// the banner instead of an empty section. Returns null only when neither
+// is available (e.g. the very first day the site has ever been used).
+function getStaleReferenceLayout() {
+  if (todayLayout) return todayLayout;
+  if (yesterdaySnapshot && yesterdaySnapshot.seed) {
+    return generateLayout(yesterdaySnapshot.seed);
+  }
+  return null;
+}
+
 function showLayoutPlaceholder() {
   const seedBadge = document.getElementById('seedBadge');
   const parBadge   = document.getElementById('layoutParBadge');
@@ -1690,9 +1722,18 @@ function showLayoutPlaceholder() {
   if (parBadge) parBadge.textContent = '—';
   if (scorecardParBadge) scorecardParBadge.textContent = 'TOTAL PAR —';
 
-  // Keep the previous (now-stale) courses/layout content visible but
-  // dimmed, rather than replacing it outright — gives the player context
-  // that this WAS today's layout a moment ago, not a blank/broken state.
+  // Populate the courses/scorecard rows with the best available reference
+  // layout (see getStaleReferenceLayout) so there's real, fully-formed
+  // content to dim underneath the waiting banner — not just whatever
+  // happened to already be in the DOM. This makes a fresh first-ever
+  // visit during the waiting window look identical to a normal
+  // mid-session reset: both show a real (if not-yet-today's) layout,
+  // dimmed, under the "Today's Courses"/"Today's Layout" labels.
+  const refLayout = getStaleReferenceLayout();
+  if (refLayout) {
+    renderCoursesAndScorecard(refLayout);
+  }
+
   const coursesRow   = document.getElementById('coursesRow');
   const scorecardRow = document.getElementById('scorecardRow');
   if (coursesRow)   coursesRow.classList.add('stale-data');
@@ -1728,9 +1769,10 @@ function clearWaitingBanners() {
 
 // Individual hole-photo placeholder — thin uniform border (matching the
 // side title box's top/bottom edge style, not its yellow side accent),
-// two-line "waiting" text in that same yellow. Used only as a fallback
-// when there's no real prior layout at all to show a photo for (e.g. a
-// genuinely first-ever load with nothing cached yet).
+// two-line "waiting" text in that same yellow. Used only as a last-resort
+// fallback when there's no reference layout at all to show a photo for
+// (i.e. getStaleReferenceLayout() returned null — no stale "today" data
+// AND no yesterday snapshot, such as the very first day the site is used).
 function sideHolePlaceholderHtml(holeNum) {
   const unitLabel = distUnit === 'm' ? 'M' : 'FT';
   return `
@@ -1746,10 +1788,10 @@ function sideHolePlaceholderHtml(holeNum) {
     </div>`;
 }
 
-// Preferred waiting state: keeps the actual last-known (stale) hole photo
-// visible, faded, with "WAITING FOR TODAY'S DATA" overlaid in the same
-// bold font/size as the "TODAY'S LAYOUT" title box, in the established
-// yellow. The label below still shows the real (stale) par/distance,
+// Preferred waiting state: shows the reference layout's real hole photo,
+// faded, with "WAITING FOR TODAY'S DATA" overlaid in the same bold
+// font/size as the "TODAY'S LAYOUT" title box, in the established yellow.
+// The label below still shows the real (if not-yet-today's) par/distance,
 // consistent with how the courses/layout rows keep their real content
 // visible-but-dimmed rather than blanking it out.
 function sideHolePlaceholderOverlayHtml(h) {
@@ -1769,15 +1811,23 @@ function sideHolePlaceholderOverlayHtml(h) {
 
 function showSidePanelsPlaceholder() {
   if (window.innerWidth < 1200) return; // desktop only, same guard as startSidePanels
-  // spL0 (the "Today's Layout" title box) is intentionally left untouched.
+
+  // The "Today's Layout" title box must stay visible during the waiting
+  // state too — previously left untouched here, which meant it simply
+  // never appeared on a fresh visit (nothing had rendered it yet).
+  const l0 = document.getElementById('spL0');
+  if (l0) l0.innerHTML = sideTitleBoxHtml();
+
   const leftIds  = ['spL1','spL2','spL3','spL4'];
   const rightIds = ['spR0','spR1','spR2','spR3','spR4'];
 
-  // Use the real last-known (stale) hole data when we have it, so the
-  // actual photo/par/distance shows underneath the faded overlay instead
-  // of an empty bordered box — falls back to the plain placeholder only
-  // if there's truly no prior layout cached yet (first-ever load).
-  const staleHoles = buildSidePanelHoles(todayLayout);
+  // Use the best available reference layout (today's own stale data if
+  // cached, else yesterday's snapshot) so the actual photo/par/distance
+  // shows underneath the faded overlay instead of an empty bordered box
+  // — falls back to the plain placeholder only if truly nothing is
+  // available yet (first day the site has ever been used).
+  const refLayout  = getStaleReferenceLayout();
+  const staleHoles = refLayout ? buildSidePanelHoles(refLayout) : [];
 
   let holeNum = 1;
   leftIds.forEach(id => {
@@ -1796,6 +1846,14 @@ function showSidePanelsPlaceholder() {
     }
     holeNum++;
   });
+
+  // Match sizing the same way the real render path does — keeps the
+  // title box and each pip's caption width consistent with the dimmed
+  // photos now showing (matchTitleBoxSize needs a real .side-hole-img to
+  // measure, which the overlay path provides; it's a harmless no-op in
+  // the last-resort plain-placeholder case, where CSS sizing takes over).
+  matchTitleBoxSize();
+  matchAllHolePipWidths();
 }
 
 function handleDailyReset() {
@@ -1821,7 +1879,8 @@ function handleDailyReset() {
   pollForNewLayout(windowKey, 0);
 }
 
-const LAYOUT_POLL_MAX_TRIES    = 12;    // ~6 minutes at 30s apart — generous safety margin
+const LAYOUT_POLL_MAX_TRIES    = 40;    // ~20 minutes at 30s apart — covers slow backend
+                                         // seed publishes (observed ~18 min on 2026-09-27)
 const LAYOUT_POLL_INTERVAL_MS  = 30000;
 
 async function pollForNewLayout(windowKey, attempt) {
@@ -1845,14 +1904,14 @@ async function pollForNewLayout(windowKey, attempt) {
     return;
   }
 
-  // Gave up waiting for a CONFIRMED change after 6 minutes. Continuing to
+  // Gave up waiting for a CONFIRMED change after 20 minutes. Continuing to
   // hide data indefinitely (until the next manual refresh) serves no one
   // well at this point — accept and render whatever's currently available
   // instead of leaving the site stuck on the placeholder forever. This
   // also correctly resolves the "cautious first-time-visitor" case: if
   // the data had actually been fine the whole time (a false alarm from
   // isEarlyInCurrentWindow()), this is what finally shows it.
-  console.warn('Gave up waiting for a confirmed new daily seed after 6 minutes — showing current data as-is.');
+  console.warn('Gave up waiting for a confirmed new daily seed after 20 minutes — showing current data as-is.');
   isWaitingForNewLayout = false;
   try {
     const layout = generateLayout(todaySeed);
@@ -2001,12 +2060,9 @@ function toggleDistUnit() {
     const yLayout = generateLayout(yesterdaySnapshot.seed);
     renderLayout(yesterdaySnapshot.seed, yLayout);
   } else if (isWaitingForNewLayout) {
-    // Re-establish today's own last-known content first (see
-    // showTodayLeaderboard for the full explanation), then re-apply the
-    // placeholder dimming/banner on top of it with the new distUnit.
-    if (todaySeed && todayLayout) {
-      renderLayout(todaySeed, todayLayout);
-    }
+    // showLayoutPlaceholder() re-derives its own reference layout (see
+    // getStaleReferenceLayout) and re-renders through it, so it already
+    // picks up the new distUnit on its own — no separate pre-render needed.
     showLayoutPlaceholder();
   } else if (todaySeed && todayLayout) {
     renderLayout(todaySeed, todayLayout);
@@ -2016,15 +2072,12 @@ function toggleDistUnit() {
 // ═══════════════════════════════════════════════════════════════════
 //  Render layout strip
 // ═══════════════════════════════════════════════════════════════════
-function renderLayout(seed, layout) {
-  document.getElementById('seedBadge').textContent      = `Seed ${seed}`;
-  document.getElementById('layoutParBadge').textContent = layout.totalPar;
-  seededPar = layout.totalPar;
-
-  // Real data has arrived — clear out any "waiting for today's data"
-  // placeholder state left over from showLayoutPlaceholder(), if present.
-  clearWaitingBanners();
-
+// Builds the courses-row and scorecard-row markup for a given layout —
+// extracted from renderLayout() so showLayoutPlaceholder() can populate
+// these same rows from a reference (stale/yesterday) layout without
+// touching the seed/par badges, which the waiting state deliberately
+// keeps at "—" rather than showing that reference layout's real numbers.
+function renderCoursesAndScorecard(layout) {
   // Map each course name to its identity color
   const COURSE_COLORS = {
     'Sunshine Glade':    'var(--course-sunshine)',
@@ -2075,6 +2128,19 @@ function renderLayout(seed, layout) {
   }).join('');
 
   document.getElementById('scorecardRow').innerHTML = scorecardHtml;
+}
+
+function renderLayout(seed, layout) {
+  document.getElementById('seedBadge').textContent      = `Seed ${seed}`;
+  document.getElementById('layoutParBadge').textContent = layout.totalPar;
+  seededPar = layout.totalPar;
+
+  // Real data has arrived — clear out any "waiting for today's data"
+  // placeholder state left over from showLayoutPlaceholder(), if present.
+  clearWaitingBanners();
+
+  renderCoursesAndScorecard(layout);
+
   document.getElementById('scorecardParBadge').textContent = `TOTAL PAR ${layout.totalPar}`;
   document.getElementById('scorecardSection').style.display = 'block';
 
@@ -3571,29 +3637,37 @@ function sideHolePhotoHtml(h) {
 
 let _lastSidePanelLayout = null;
 
+// Builds the "TODAY'S LAYOUT" / "YESTERDAY'S LAYOUT" title box markup for
+// the left side panel's top section (spL0). Extracted so both the real
+// render path (startSidePanels) and the waiting/placeholder path
+// (showSidePanelsPlaceholder) render the exact same title box — the
+// title reflects whatever label is currently showing (Today's vs
+// Yesterday's), not which layout is actually behind it.
+function sideTitleBoxHtml() {
+  const fullTitle = document.querySelector('#scorecardSection .layout-section-label')
+    ? document.querySelector('#scorecardSection .layout-section-label').textContent
+    : "Today's Layout";
+  // Split "Today's Layout" / "Yesterday's Layout" into two lines
+  const parts = fullTitle.toUpperCase().split(' ');
+  const line1 = parts[0] || "TODAY'S";
+  const line2 = parts[1] || 'LAYOUT';
+
+  return `
+    <div class="side-title-box">
+      <div class="side-title-text"><span style="display:block;margin-bottom:14px;">${line1}</span><span style="display:block;">${line2}</span></div>
+    </div>`;
+}
+
 function startSidePanels(layout) {
   _lastSidePanelLayout = layout;
   if (window.innerWidth < 1200) return;
   const holes = buildSidePanelHoles(layout);
   if (holes.length < 9) return;
 
-  const fullTitle = document.querySelector('#scorecardSection .layout-section-label')
-    ? document.querySelector('#scorecardSection .layout-section-label').textContent
-    : "Today's Layout";
-  // Split "Today's Layout" / "Yesterday's Layout" into two lines
-  const parts    = fullTitle.toUpperCase().split(' ');
-  const line1    = parts[0] || "TODAY'S";
-  const line2    = parts[1] || 'LAYOUT';
-
-  const titleHtml = `
-    <div class="side-title-box">
-      <div class="side-title-text"><span style="display:block;margin-bottom:14px;">${line1}</span><span style="display:block;">${line2}</span></div>
-    </div>`;
-
   // Left panel: title box in section 0, hole photos 1-4 in sections 1-4
   const leftIds = ['spL0', 'spL1', 'spL2', 'spL3', 'spL4'];
   const l0 = document.getElementById(leftIds[0]);
-  if (l0) l0.innerHTML = titleHtml;
+  if (l0) l0.innerHTML = sideTitleBoxHtml();
   for (let i = 0; i < 4; i++) {
     const el = document.getElementById(leftIds[i + 1]);
     if (el) el.innerHTML = sideHolePhotoHtml(holes[i]);
