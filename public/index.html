@@ -132,7 +132,7 @@
     position: absolute; left: 50%; top: 50%;
     transform: translate(-50%, -50%);
     font-family: 'DM Mono', monospace;
-    font-size: 9px; letter-spacing: 2px;
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
     color: #debc3e; text-transform: uppercase;
     white-space: nowrap;
     pointer-events: none;
@@ -448,7 +448,7 @@
       justify-content: center;
     }
     .side-hole-img-faded {
-      opacity: 0.18;
+      opacity: 0.10;
     }
     .side-hole-waiting-overlay {
       position: absolute;
@@ -1470,6 +1470,18 @@ function showTodayLeaderboard() {
     // while still waiting looks identical to a fresh, first-ever visit
     // during the same waiting window. No separate pre-render needed here.
     showLayoutPlaceholder();
+    // fetchScoresOnly() below intentionally no-ops while still waiting
+    // (it must not render possibly-still-previous-day scores), so it
+    // will NOT clear whatever is currently in the leaderboard rows. If
+    // the user just switched back from viewing Yesterday's Leaderboard,
+    // those are still yesterday's actual rows sitting in the DOM — clear
+    // them explicitly here so "today, waiting" never shows yesterday's
+    // leaderboard underneath it.
+    document.getElementById('lbRows').innerHTML = '';
+    document.getElementById('resultsCount').innerHTML = '<span>0</span> players on today\'s leaderboard';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyStateMsg').textContent = 'New day started — waiting for today\'s layout...';
+    document.getElementById('leaderboardSection').style.display = 'block';
   } else if (seededPar && todaySeed && todayLayout) {
     renderLayout(todaySeed, todayLayout);
   }
