@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Disc Golf Valley VR — Daily Challenge</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;700;800&display=swap" rel="stylesheet">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root {
@@ -38,7 +38,98 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  /* ── Under Construction ticker (caution-tape banner) ──
+     Fixed to the top of the viewport; --ticker-h is reused to push the
+     page content and the desktop side panels down so nothing sits
+     underneath it. Everything here is inert until TICKER_ENABLED = true
+     in the script adds the "ticker-on" class to <body>. */
+  :root {
+    --ticker-h:       46px;
+    --tape-yellow:    #f5b313;
+    --tape-black:     #1b1b1b;
+    --tape-stripe-h:  9px;
+  }
+  @media (max-width: 600px) {
+    :root { --ticker-h: 38px; --tape-stripe-h: 7px; }
+  }
+  /* Off by default: no banner and no layout offset. */
+  .ticker { display: none; }
+  body.ticker-on { --ticker-offset: var(--ticker-h); }
+  body.ticker-on .ticker {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--ticker-h);
+    z-index: 400; /* above page + side panels, below modals (500/1000) */
+    background: var(--tape-yellow);
+    overflow: hidden;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+  }
+  /* Diagonal black/yellow hazard stripes along the top and bottom edges.
+     The stripe pattern slides with the text so the whole tape appears
+     to be moving, not just the words. */
+  .ticker::before,
+  .ticker::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: calc(100% + 56px);
+    height: var(--tape-stripe-h);
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--tape-black) 0 14px,
+      var(--tape-yellow) 14px 28px
+    );
+    /* Duration set from JS (buildTicker) so stripes move at exactly the
+       same pixels-per-second as the text. 1.98s = 39.6px at 20px/s. */
+    animation: tape-stripes var(--stripe-duration, 1.98s) linear infinite;
+  }
+  .ticker::before { top: 0; }
+  .ticker::after  { bottom: 0; }
+  @keyframes tape-stripes {
+    from { transform: translateX(0); }
+    to   { transform: translateX(calc(-28px * 1.41421356)); }
+  }
+  .ticker-track {
+    display: flex;
+    width: max-content;
+    animation: ticker-scroll var(--ticker-duration, 40s) linear infinite;
+    will-change: transform;
+  }
+  @keyframes ticker-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 22px;
+    padding-right: 22px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 800;
+    font-size: 17px;
+    letter-spacing: 0.5px;
+    color: var(--tape-black);
+    text-transform: uppercase;
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .ticker-icon { width: 22px; height: 22px; flex-shrink: 0; }
+  @media (max-width: 600px) {
+    .ticker-item { font-size: 13px; gap: 16px; padding-right: 16px; }
+    .ticker-icon { width: 17px; height: 17px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-track, .ticker::before, .ticker::after { animation: none; }
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
   body {
+    padding-top: var(--ticker-offset, 0px);
     background: var(--green-deep);
     color: var(--white);
     font-family: 'DM Sans', sans-serif;
@@ -291,7 +382,7 @@
        content at any viewport width — see side-panel-left/-right below. */
     .side-panel {
       position: fixed;
-      top: 0; bottom: 0;
+      top: var(--ticker-offset, 0px); bottom: 0; /* start below the ticker when it's on */
       z-index: 0;
       pointer-events: none;
       display: flex;
@@ -1162,6 +1253,11 @@
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
+<!-- ── Under Construction ticker ── -->
+<div class="ticker">
+  <span class="sr-only">This site is under construction.</span>
+  <div class="ticker-track" id="tickerTrack" aria-hidden="true"></div>
+</div>
 <div class="container">
 
   <!-- ── Header ── -->
@@ -3862,6 +3958,56 @@ function computeAnyBestWorst(playerName) {
   if (ratings.length === 0) return null;
   return { bestRound: Math.round(Math.max(...ratings)), worstRound: Math.round(Math.min(...ratings)) };
 }
+
+// ── Under Construction ticker ──────────────────────────────────────
+// Builds enough "UNDER CONSTRUCTION ⚠" items to fill the widest screen,
+// then duplicates the set so the -50% scroll loops seamlessly. Duration
+// scales with track width so the scroll speed stays constant on every
+// screen size. Rebuilt (debounced) on resize.
+// ── ON/OFF SWITCH ── set to true to show the banner, false to hide it.
+// While false the page looks and behaves exactly as it did before.
+const TICKER_ENABLED    = false;
+const TICKER_TEXT       = 'Under Construction';
+const TICKER_SPEED_PXPS = 20; // scroll speed in pixels per second (stripes follow automatically)
+const TICKER_ICON_SVG = `
+  <svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+    <path d="M12 3 L22.5 21 H1.5 Z"/>
+    <line x1="12" y1="9.5" x2="12" y2="14.5"/>
+    <circle cx="12" cy="17.6" r="0.6" fill="currentColor"/>
+  </svg>`;
+
+function buildTicker() {
+  if (!TICKER_ENABLED) return;
+  const track = document.getElementById('tickerTrack');
+  if (!track) return;
+  const itemHtml = `<span class="ticker-item">${TICKER_TEXT}${TICKER_ICON_SVG}</span>`;
+
+  // Measure one item, then fill at least one full screen width per half
+  track.innerHTML = itemHtml;
+  const itemW = track.firstElementChild.getBoundingClientRect().width || 260;
+  const perHalf = Math.ceil(window.innerWidth / itemW) + 1;
+  const half = itemHtml.repeat(perHalf);
+  track.innerHTML = half + half;
+
+  const halfWidth = itemW * perHalf;
+  track.style.setProperty('--ticker-duration', (halfWidth / TICKER_SPEED_PXPS) + 's');
+
+  // Keep the edge stripes locked to the text speed: one stripe period
+  // (28px perpendicular spacing at 45° = 39.6px horizontally) per cycle.
+  const STRIPE_PERIOD_PX = 28 * Math.SQRT2;
+  track.parentElement.style.setProperty('--stripe-duration', (STRIPE_PERIOD_PX / TICKER_SPEED_PXPS) + 's');
+}
+
+let _tickerResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_tickerResizeTimer);
+  _tickerResizeTimer = setTimeout(buildTicker, 200);
+});
+if (TICKER_ENABLED) document.body.classList.add('ticker-on');
+buildTicker();
+// Re-measure once web fonts finish loading (item width changes with the font)
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(buildTicker);
 
 loadFlaggedPlayers();
 loadNerdPlayers();
