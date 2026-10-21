@@ -2537,12 +2537,28 @@ let currentHistoryTab = 7;
 // if you're confident a given stretch of history is fully trustworthy.
 const DATA_CUTOFF_DATE = '2026-07-03'; // Only data on/after this date counts toward ANY calculation
 
+// Individual days to drop from ALL player stats (history modal averages,
+// best/worst, rounds played, live DGV VR ratings, round ratings). Use for
+// a day whose data can't be trusted — e.g. a game update that changed the
+// course pool mid-window. Dates are the UTC challenge-window date, same
+// format as history.json ("YYYY-MM-DD"). Applied once when history.json
+// loads, so every calculation downstream sees the day as if it never
+// happened. Leave the array empty to exclude nothing.
+//
+// Example: const EXCLUDED_STAT_DATES = ['2026-10-21'];
+const EXCLUDED_STAT_DATES = [];
+
 async function loadHistoryData() {
   if (historyLoaded) return;
   try {
     const res = await fetch('history.json?_=' + Date.now());
     if (!res.ok) { historyData = []; }
-    else { historyData = await res.json(); }
+    else {
+      const raw = await res.json();
+      historyData = Array.isArray(raw)
+        ? raw.filter(day => !EXCLUDED_STAT_DATES.includes(day.date))
+        : [];
+    }
   } catch(e) {
     historyData = [];
   }
@@ -3966,7 +3982,7 @@ function computeAnyBestWorst(playerName) {
 // screen size. Rebuilt (debounced) on resize.
 // ── ON/OFF SWITCH ── set to true to show the banner, false to hide it.
 // While false the page looks and behaves exactly as it did before.
-const TICKER_ENABLED    = false;
+const TICKER_ENABLED    = true;
 const TICKER_TEXT       = 'Under Construction';
 const TICKER_SPEED_PXPS = 20; // scroll speed in pixels per second (stripes follow automatically)
 const TICKER_ICON_SVG = `
