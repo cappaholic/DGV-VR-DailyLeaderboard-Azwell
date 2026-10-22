@@ -34,6 +34,10 @@
     --course-harrowing:  #5D5580;   /* Harrowing Woods   – Twilight Purple */
     --course-crows:      #A8B4BC;   /* Crow's Nest       – Steel Gray      */
     --course-grizzly:    #C26F21;   /* Grizzly Gulch     – Deep Orange     */
+    --course-kahopark:   #7DB544;   /* Kaho Park         – Meadow Green    */
+    --course-owlwood:    #5C9E7A;   /* Owlwood           – Misty Moss      */
+    --course-coyote:     #D2603E;   /* Coyote Canyon     – Red Rock        */
+    --course-backwoods:  #B5414F;   /* Kaho Backwoods    – Autumn Maple    */
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1540,7 +1544,7 @@ function toggleYesterdayLeaderboard() {
     document.getElementById('scorecardSection').classList.add('yesterday-mode');
     // Render yesterday's layout if snapshot contains seed
     if (yesterdaySnapshot.seed) {
-      const yLayout = generateLayout(yesterdaySnapshot.seed);
+      const yLayout = generateLayout(yesterdaySnapshot.seed, getYesterdayDateKey());
       renderLayout(yesterdaySnapshot.seed, yLayout);
     }
     updateYesterdayBtn();
@@ -1596,9 +1600,11 @@ function renderSnapshotLeaderboard(snap) {
   const savedPar    = seededPar;
 
   // Set par to yesterday's value so VS Par calculates correctly
+  // (falls back to the snapshot's stored par if the layout's par isn't
+  //  fully known, e.g. a new course with unconfirmed pars)
   if (snap.seed) {
-    const yLayout = generateLayout(snap.seed);
-    seededPar = yLayout.totalPar;
+    const yLayout = generateLayout(snap.seed, snap.date || getYesterdayDateKey());
+    seededPar = yLayout.totalPar ?? snap.par ?? null;
   } else if (snap.par) {
     seededPar = snap.par;
   }
@@ -1698,7 +1704,7 @@ async function syncTodayData() {
   try {
     const currentSeed = await fetchDailySeed(accessToken);
     if (currentSeed !== todaySeed) {
-      const layout = generateLayout(currentSeed);
+      const layout = generateLayout(currentSeed, getTodayDateKey());
       renderLayout(currentSeed, layout);
       seededPar   = layout.totalPar;
       todaySeed   = currentSeed;
@@ -1817,7 +1823,7 @@ let layoutPollTimer      = null;
 function getStaleReferenceLayout() {
   if (todayLayout) return todayLayout;
   if (yesterdaySnapshot && yesterdaySnapshot.seed) {
-    return generateLayout(yesterdaySnapshot.seed);
+    return generateLayout(yesterdaySnapshot.seed, getYesterdayDateKey());
   }
   return null;
 }
@@ -1906,12 +1912,12 @@ function sideHolePlaceholderOverlayHtml(h) {
   return `
     <div class="side-hole-pip">
       <div class="side-hole-photo-wrap">
-        <img class="side-hole-img side-hole-img-faded" style="--hole-color:${h.color}" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
+        <img class="side-hole-img side-hole-img-faded" style="--hole-color:${h.color}" src="${h.photo}" alt="Hole ${h.layoutHole}" onerror="sideImgFallback(this)"/>
         <div class="side-hole-waiting-overlay">Waiting for<br>Today's Data</div>
       </div>
       <div class="side-hole-label">
         <span class="side-hole-label-item">Hole <span class="side-hole-label-white">${h.layoutHole}</span></span>
-        <span class="side-hole-label-item">PAR ${h.par}</span>
+        <span class="side-hole-label-item">PAR ${h.par ?? '?'}</span>
         <span class="side-hole-label-item">${h.dist}</span>
       </div>
     </div>`;
@@ -2022,7 +2028,7 @@ async function pollForNewLayout(windowKey, attempt) {
   console.warn('Gave up waiting for a confirmed new daily seed after 20 minutes — showing current data as-is.');
   isWaitingForNewLayout = false;
   try {
-    const layout = generateLayout(todaySeed);
+    const layout = generateLayout(todaySeed, getTodayDateKey());
     renderLayout(todaySeed, layout);
     seededPar   = layout.totalPar;
     todayLayout = layout;
@@ -2088,25 +2094,208 @@ function SystemRandom(seed) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Course data
+//  Course registry — SINGLE SOURCE OF TRUTH for every course
+//
+//  Everything course-specific (pars, distances, identity color, hole
+//  photo filename prefix) lives here and nowhere else. The layout strip,
+//  scorecard, side panels and hole slideshow all read from this object.
+//  Adding a course = one entry here + its name in a COURSE_POOLS list.
+//
+//  pars:   one entry per hole, in hole order. Use null for a par that
+//          isn't confirmed yet — the site degrades gracefully (shows
+//          "PAR ?" and falls back to raw strokes instead of VS Par)
+//          rather than showing a wrong number.
+//  ft / m: one entry per hole, in hole order.
+//  abbr:   hole photo prefix → holes/<abbr><holeNum>.png
 // ═══════════════════════════════════════════════════════════════════
-const COURSES = [
-  { name: 'Sunshine Glade',    holes: [3,3,3,3,4] },
-  { name: 'Blueberry Thicket', holes: [3,3,4,3,3,3,3,3,3] },
-  { name: 'Oak Hill',          holes: [4,3,4,4,4,4,4,4,3] },
-  { name: 'Lakeside',          holes: [3,4,3,5,4,3,3,3,5] },
-  { name: 'Windswept Fields',  holes: [3,4,4,3,4,3,3,3,3] },
-  { name: 'Harrowing Woods',   holes: [3,3,3,3,4,4,3,4,5] },
-  { name: 'The Crows Nest',    holes: [3,3,4,4,3,3,4,3,4] },
-  { name: 'Grizzly Gulch',     holes: [3,3,4,3,4,4,3,4,3] }
+const COURSE_DATA = {
+  'Sunshine Glade': {
+    abbr: 'SG', color: 'var(--course-sunshine)',
+    pars: [3,3,3,3,4],
+    ft:   [199,269,246,243,495],
+    m:    [61,82,75,74,151],
+  },
+  'Blueberry Thicket': {
+    abbr: 'BT', color: 'var(--course-blueberry)',
+    pars: [3,3,4,3,3,3,3,3,3],
+    ft:   [301,271,490,293,346,234,219,224,281],
+    m:    [92,83,149,89,105,71,67,68,86],
+  },
+  'Oak Hill': {
+    abbr: 'OH', color: 'var(--course-oakhill)',
+    pars: [4,3,4,4,4,4,4,4,3],
+    ft:   [576,289,622,517,553,447,672,593,347],
+    m:    [176,88,190,158,168,136,205,181,106],
+  },
+  'Lakeside': {
+    abbr: 'LS', color: 'var(--course-lakeside)',
+    pars: [3,4,3,5,4,3,3,3,5],
+    ft:   [309,433,297,480,556,232,296,289,726],
+    m:    [94,132,91,146,169,71,90,88,221],
+  },
+  'Windswept Fields': {
+    abbr: 'WF', color: 'var(--course-windswept)',
+    pars: [3,4,4,3,4,3,3,3,3],
+    ft:   [326,535,520,396,404,260,251,298,314],
+    m:    [99,163,158,121,123,79,77,91,96],
+  },
+  'Harrowing Woods': {
+    abbr: 'HW', color: 'var(--course-harrowing)',
+    pars: [3,3,3,3,4,4,3,4,5],
+    ft:   [368,324,303,257,365,406,277,355,783],
+    m:    [112,99,92,78,111,124,84,108,239],
+  },
+  'The Crows Nest': {
+    abbr: 'CN', color: 'var(--course-crows)',
+    pars: [3,3,4,4,3,3,4,3,4],
+    ft:   [266,245,332,199,640,187,329,327,497],
+    m:    [81,75,101,61,195,57,100,100,151],
+  },
+  'Grizzly Gulch': {
+    abbr: 'GG', color: 'var(--course-grizzly)',
+    pars: [3,3,4,3,4,4,3,4,3],
+    ft:   [357,368,347,328,435,462,448,511,484],
+    m:    [109,112,106,100,133,142,137,156,147],
+  },
+
+  // ── New courses (pending release) ─────────────────────────────────
+  // Distances confirmed from the course chart. Pars: null = not yet
+  // confirmed. Known so far from tee signs: KP6=4, OW3=3, CC5=4, KB3=3.
+  'Kaho Park': {
+    abbr: 'KP', color: 'var(--course-kahopark)',
+    pars: [null,null,null,null,null,4,null,null,null],
+    ft:   [495,673,369,816,365,612,943,342,437],
+    m:    [151,205,113,249,111,187,287,104,133],
+  },
+  'Owlwood': {
+    abbr: 'OW', color: 'var(--course-owlwood)',
+    pars: [null,null,3,null,null,null,null,null,null],
+    ft:   [417,513,326,243,454,427,383,639,461],
+    m:    [127,156,99,74,138,130,117,195,140],
+  },
+  'Coyote Canyon': {
+    abbr: 'CC', color: 'var(--course-coyote)',
+    pars: [null,null,null,null,4,null,null,null,null],
+    ft:   [390,566,650,455,673,497,493,290,872],
+    m:    [119,172,198,139,205,152,150,88,266],
+  },
+  'Kaho Backwoods': {
+    abbr: 'KB', color: 'var(--course-backwoods)',
+    pars: [null,null,3,null,null,null,null,null,null],
+    ft:   [471,688,453,840,470,397,329,778,440],
+    m:    [143,210,138,256,143,121,100,237,134],
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  Course pools — which courses the daily challenge draws from, by date
+//
+//  ORDER MATTERS: generateLayout() picks by index into this list, so it
+//  must match the game's own internal course list order exactly.
+//
+//  Pools are date-versioned so OLD seeds keep generating OLD layouts.
+//  Without this, the moment the new courses are added, yesterday's
+//  leaderboard/layout (yesterday.json) would be regenerated from the
+//  wrong pool on the first day after release and show the wrong courses
+//  and wrong par.
+//
+//  ── GO-LIVE (the only change needed on release day) ──
+//  Set NEW_COURSES_START_DATE to the UTC date (YYYY-MM-DD) of the first
+//  daily challenge window that uses the new courses. With
+//  RESET_HOUR_UTC = 0 that's simply the UTC date the window starts on.
+//  The constant can be set ahead of time — nothing changes until then.
+//
+//  ── PREVIEW BEFORE GO-LIVE ──
+//  Add ?coursePool=v2 to the URL to force today's layout onto the new
+//  pool (only for that browser tab, only for today's layout).
+// ═══════════════════════════════════════════════════════════════════
+const NEW_COURSES_START_DATE = null; // e.g. '2026-10-20'
+
+const COURSE_POOLS = [
+  {
+    id: 'v1',
+    start: null, // always available as the fallback
+    courses: [
+      'Sunshine Glade', 'Blueberry Thicket', 'Oak Hill', 'Lakeside',
+      'Windswept Fields', 'Harrowing Woods', 'The Crows Nest', 'Grizzly Gulch',
+    ],
+  },
+  {
+    id: 'v2',
+    start: NEW_COURSES_START_DATE,
+    // Order confirmed: the 4 new courses are appended to the end of the
+    // game's existing course list, in this order. If a real Daily Challenge
+    // ever disagrees, findCoursePoolOrder() below will identify the fix.
+    courses: [
+      'Sunshine Glade', 'Blueberry Thicket', 'Oak Hill', 'Lakeside',
+      'Windswept Fields', 'Harrowing Woods', 'The Crows Nest', 'Grizzly Gulch',
+      'Kaho Park', 'Owlwood', 'Coyote Canyon', 'Kaho Backwoods',
+    ],
+  },
 ];
+
+const POOL_OVERRIDE = (() => {
+  try { return new URLSearchParams(location.search).get('coursePool'); }
+  catch (e) { return null; }
+})();
+
+// Date key (YYYY-MM-DD) for the CURRENT daily window
+function getTodayDateKey() {
+  return getDailyWindow().startUTC.toISOString().slice(0, 10);
+}
+
+// Date key for the day yesterday.json belongs to
+function getYesterdayDateKey() {
+  if (yesterdaySnapshot && yesterdaySnapshot.date) return yesterdaySnapshot.date;
+  const start = getDailyWindow().startUTC;
+  return new Date(start.getTime() - 86400000).toISOString().slice(0, 10);
+}
+
+function getCoursePool(dateKey) {
+  const key = dateKey || getTodayDateKey();
+  if (POOL_OVERRIDE && key === getTodayDateKey()) {
+    const forced = COURSE_POOLS.find(p => p.id === POOL_OVERRIDE);
+    if (forced) return forced;
+  }
+  let active = COURSE_POOLS[0];
+  COURSE_POOLS.forEach(p => { if (p.start && p.start <= key) active = p; });
+  return active;
+}
+
+function getCourseColor(name) {
+  return (COURSE_DATA[name] && COURSE_DATA[name].color) || 'var(--green-neon)';
+}
+
+function getHolePhotoPath(name, holeNum) {
+  const abbr = (COURSE_DATA[name] && COURSE_DATA[name].abbr) || 'XX';
+  return `holes/${abbr}${holeNum}.png`;
+}
+
+// Startup sanity check — logs loudly in the console if any course in a
+// pool is missing data, so mistakes show up during preview, not live.
+(function validateCourseData() {
+  COURSE_POOLS.forEach(pool => {
+    pool.courses.forEach(name => {
+      const c = COURSE_DATA[name];
+      if (!c) { console.error(`[DGVR] Pool ${pool.id}: no COURSE_DATA for "${name}"`); return; }
+      const n = c.pars.length;
+      if (c.ft.length !== n || c.m.length !== n) {
+        console.error(`[DGVR] "${name}": pars/ft/m arrays have different lengths`);
+      }
+      const missing = c.pars.map((p, i) => p == null ? i + 1 : null).filter(Boolean);
+      if (missing.length) {
+        console.warn(`[DGVR] "${name}": par not confirmed for hole(s) ${missing.join(', ')}`);
+      }
+    });
+  });
+})();
 
 // ═══════════════════════════════════════════════════════════════════
 //  Layout generation (pick-and-remove courses, LINQ OrderBy holes)
 // ═══════════════════════════════════════════════════════════════════
-function generateLayout(seed) {
+function generateLayoutFromPool(seed, poolNames) {
   const rng  = SystemRandom(seed);
-  const pool = COURSES.slice();
+  const pool = poolNames.map(name => ({ name, holes: COURSE_DATA[name].pars }));
   const selected = [];
 
   // Pick-and-remove 3 courses
@@ -2117,46 +2306,89 @@ function generateLayout(seed) {
   }
 
   let totalPar = 0;
-  const courses = selected.map((course, ci) => {
+  const courses = selected.map(course => {
     // LINQ OrderBy(h => rnd.Next()) — one key per hole, stable sort, take 3
     const keyed = course.holes.map((par, i) => ({ holeNum: i + 1, par, key: rng.next() }));
     keyed.sort((a, b) => a.key - b.key);
     const holes = keyed.slice(0, 3);
-    const coursePar = holes.reduce((s, h) => s + h.par, 0);
-    totalPar += coursePar;
+    const coursePar = holes.some(h => h.par == null)
+      ? null
+      : holes.reduce((s, h) => s + h.par, 0);
+    if (totalPar !== null) totalPar = coursePar === null ? null : totalPar + coursePar;
     return { course, holes, coursePar };
   });
 
+  // totalPar is null if ANY selected hole has an unconfirmed par —
+  // formatVsPar() already handles a null par by showing raw strokes.
   return { courses, totalPar };
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  Hole distance data & unit toggle
-// ═══════════════════════════════════════════════════════════════════
-const HOLE_DISTANCES = {
-  'Sunshine Glade':    { ft: { 1:199, 2:269, 3:246, 4:243, 5:495 },
-                         m:  { 1:61,  2:82,  3:75,  4:74,  5:151 } },
-  'Blueberry Thicket': { ft: { 1:301, 2:271, 3:490, 4:293, 5:346, 6:234, 7:219, 8:224, 9:281 },
-                         m:  { 1:92,  2:83,  3:149, 4:89,  5:105, 6:71,  7:67,  8:68,  9:86  } },
-  'Oak Hill':          { ft: { 1:576, 2:289, 3:622, 4:517, 5:553, 6:447, 7:672, 8:593, 9:347 },
-                         m:  { 1:176, 2:88,  3:190, 4:158, 5:168, 6:136, 7:205, 8:181, 9:106 } },
-  'Lakeside':          { ft: { 1:309, 2:433, 3:297, 4:480, 5:556, 6:232, 7:296, 8:289, 9:726 },
-                         m:  { 1:94,  2:132, 3:91,  4:146, 5:169, 6:71,  7:90,  8:88,  9:221 } },
-  'Windswept Fields':  { ft: { 1:326, 2:535, 3:520, 4:396, 5:404, 6:260, 7:251, 8:298, 9:314 },
-                         m:  { 1:99,  2:163, 3:158, 4:121, 5:123, 6:79,  7:77,  8:91,  9:96  } },
-  'Harrowing Woods':   { ft: { 1:368, 2:324, 3:303, 4:257, 5:365, 6:406, 7:277, 8:355, 9:783 },
-                         m:  { 1:112, 2:99,  3:92,  4:78,  5:111, 6:124, 7:84,  8:108, 9:239 } },
-  'The Crows Nest':    { ft: { 1:266, 2:245, 3:332, 4:199, 5:640, 6:187, 7:329, 8:327, 9:497 },
-                         m:  { 1:81,  2:75,  3:101, 4:61,  5:195, 6:57,  7:100, 8:100, 9:151 } },
-  'Grizzly Gulch':     { ft: { 1:357, 2:368, 3:347, 4:328, 5:435, 6:462, 7:448, 8:511, 9:484 },
-                         m:  { 1:109, 2:112, 3:106, 4:100, 5:133, 6:142, 7:137, 8:156, 9:147 } },
-};
+// dateKey: the YYYY-MM-DD daily window the seed belongs to (defaults to
+// today). Always pass it for anything that isn't today's live layout.
+function generateLayout(seed, dateKey) {
+  return generateLayoutFromPool(seed, getCoursePool(dateKey).courses);
+}
 
+// ═══════════════════════════════════════════════════════════════════
+//  Release-day helper: find the game's real course order
+//
+//  If the ?coursePool=v2 preview doesn't match what the game shows, run
+//  this in the browser console with one or more real observations (more
+//  observations = fewer false matches). It tries every way the 4 new
+//  courses could be inserted into the original 8 (keeping the original 8
+//  in their known order) and prints every order consistent with ALL
+//  observations. Paste the winning order into COURSE_POOLS v2.
+//
+//  findCoursePoolOrder([
+//    { seed: 123456789,
+//      courses: ['Owlwood', 'Lakeside', 'Kaho Park'],   // in play order
+//      holes:   [[3,7,1], [2,9,5], [6,4,8]] },         // optional, per course
+//  ]);
+// ═══════════════════════════════════════════════════════════════════
+function findCoursePoolOrder(observations) {
+  const base  = COURSE_POOLS[0].courses;
+  const added = ['Kaho Park', 'Owlwood', 'Coyote Canyon', 'Kaho Backwoods'];
+  const total = base.length + added.length;
+
+  const perms = arr => arr.length <= 1 ? [arr]
+    : arr.flatMap((x, i) => perms([...arr.slice(0, i), ...arr.slice(i + 1)]).map(p => [x, ...p]));
+  const combos = (n, k, start = 0) => k === 0 ? [[]]
+    : Array.from({ length: n - start }, (_, i) => start + i)
+        .flatMap(i => combos(n, k - 1, i + 1).map(c => [i, ...c]));
+
+  const matches = [];
+  combos(total, added.length).forEach(slots => {
+    perms(added).forEach(order => {
+      const pool = [];
+      let bi = 0, ai = 0;
+      for (let i = 0; i < total; i++) pool.push(slots.includes(i) ? order[ai++] : base[bi++]);
+      const ok = observations.every(obs => {
+        const L = generateLayoutFromPool(obs.seed, pool);
+        return L.courses.every((c, ci) =>
+          c.course.name === obs.courses[ci] &&
+          (!obs.holes || c.holes.every((h, hi) => h.holeNum === obs.holes[ci][hi])));
+      });
+      if (ok) matches.push(pool);
+    });
+  });
+
+  if (matches.length === 0) {
+    console.warn('No insertion order matched. The game may have reordered the original courses or changed how the daily layout is picked.');
+  } else {
+    console.log(`${matches.length} matching order(s):`);
+    matches.forEach(m => console.log(JSON.stringify(m)));
+  }
+  return matches;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Hole distance & unit toggle
+// ═══════════════════════════════════════════════════════════════════
 function getHoleDist(courseName, holeNum) {
-  const cd = HOLE_DISTANCES[courseName];
+  const cd = COURSE_DATA[courseName];
   if (!cd) return '';
-  const val = cd[distUnit][holeNum];
-  return val ? val + ' ' + distUnit.toUpperCase() : '';
+  const val = cd[distUnit][holeNum - 1];
+  return val ? val + ' ' + distUnit.toUpperCase() : '';
 }
 
 function toggleDistUnit() {
@@ -2165,7 +2397,7 @@ function toggleDistUnit() {
   if (btn) btn.textContent = distUnit === 'ft' ? 'FT / M' : 'M / FT';
   // Re-render whichever layout is currently showing
   if (viewingYesterday && yesterdaySnapshot && yesterdaySnapshot.seed) {
-    const yLayout = generateLayout(yesterdaySnapshot.seed);
+    const yLayout = generateLayout(yesterdaySnapshot.seed, getYesterdayDateKey());
     renderLayout(yesterdaySnapshot.seed, yLayout);
   } else if (isWaitingForNewLayout) {
     // showLayoutPlaceholder() re-derives its own reference layout (see
@@ -2186,21 +2418,7 @@ function toggleDistUnit() {
 // touching the seed/par badges, which the waiting state deliberately
 // keeps at "—" rather than showing that reference layout's real numbers.
 function renderCoursesAndScorecard(layout) {
-  // Map each course name to its identity color
-  const COURSE_COLORS = {
-    'Sunshine Glade':    'var(--course-sunshine)',
-    'Blueberry Thicket': 'var(--course-blueberry)',
-    'Oak Hill':          'var(--course-oakhill)',
-    'Lakeside':          'var(--course-lakeside)',
-    'Windswept Fields':  'var(--course-windswept)',
-    'Harrowing Woods':   'var(--course-harrowing)',
-    'The Crows Nest':    'var(--course-crows)',
-    'Grizzly Gulch':     'var(--course-grizzly)'
-  };
-
-  const courseColors = layout.courses.map(entry =>
-    COURSE_COLORS[entry.course.name] || 'var(--green-neon)'
-  );
+  const courseColors = layout.courses.map(entry => getCourseColor(entry.course.name));
 
   document.getElementById('coursesRow').innerHTML = layout.courses.map((entry, ci) => {
     const color = courseColors[ci];
@@ -2230,7 +2448,7 @@ function renderCoursesAndScorecard(layout) {
         <span class="scorecard-pip-label">Hole</span>
         <span class="scorecard-pip-num">${ci * 3 + hi + 1}</span>
         <span class="scorecard-pip-dist">${getHoleDist(entry.course.name, h.holeNum)}</span>
-        <span class="scorecard-pip-par">PAR ${h.par}</span>
+        <span class="scorecard-pip-par">PAR ${h.par ?? '?'}</span>
       </div>
     `);
   }).join('');
@@ -2240,7 +2458,7 @@ function renderCoursesAndScorecard(layout) {
 
 function renderLayout(seed, layout) {
   document.getElementById('seedBadge').textContent      = `Seed ${seed}`;
-  document.getElementById('layoutParBadge').textContent = layout.totalPar;
+  document.getElementById('layoutParBadge').textContent = layout.totalPar ?? '—';
   seededPar = layout.totalPar;
 
   // Real data has arrived — clear out any "waiting for today's data"
@@ -2249,7 +2467,7 @@ function renderLayout(seed, layout) {
 
   renderCoursesAndScorecard(layout);
 
-  document.getElementById('scorecardParBadge').textContent = `TOTAL PAR ${layout.totalPar}`;
+  document.getElementById('scorecardParBadge').textContent = `TOTAL PAR ${layout.totalPar ?? '—'}`;
   document.getElementById('scorecardSection').style.display = 'block';
 
   document.getElementById('layoutStrip').classList.add('show');
@@ -2712,19 +2930,24 @@ function renderHistoryContent(playerName, days) {
     return;
   }
 
-  // Compute avg rank and avg VS par from post-cutoff played days
+  // Compute avg rank and avg VS par from post-cutoff played days.
+  // A day saved without a par (vsPar null — e.g. seed fetch failed, or a
+  // course whose pars weren't entered yet) still counts toward rank, but
+  // is skipped for VS Par so it can't be silently counted as "even".
   let totalRank = 0;
   let totalVsPar = 0;
+  let vsParDays  = 0;
   played.forEach(day => {
     const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-    totalVsPar += me.vsPar;
+    if (typeof me.vsPar === 'number') { totalVsPar += me.vsPar; vsParDays++; }
     totalRank  += me.rank;
   });
 
   const avgRank  = totalRank  / played.length;
-  const avgVsPar = totalVsPar / played.length;
+  const avgVsPar = vsParDays > 0 ? totalVsPar / vsParDays : 0;
 
-  const vsParDisplay = avgVsPar === 0 ? 'E'
+  const vsParDisplay = vsParDays === 0 ? '—'
+    : avgVsPar === 0 ? 'E'
     : (avgVsPar > 0 ? '+' : '') + avgVsPar.toFixed(1);
   const vsParCls = avgVsPar < 0 ? 'under' : avgVsPar >= 1 ? 'over' : 'even';
 
@@ -2743,15 +2966,17 @@ function renderHistoryContent(playerName, days) {
 
     played.forEach(day => {
       const me = day.players.find(p => stripDiscTag(p.name) === playerName || p.name === playerName);
-      if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
-      if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
+      if (typeof me.vsPar === 'number') {
+        if (me.vsPar < bestVsPar)  bestVsPar  = me.vsPar;
+        if (me.vsPar > worstVsPar) worstVsPar = me.vsPar;
+      }
       if (me.rank  < bestRank)   bestRank   = me.rank;
       if (me.rank  > worstRank)  worstRank  = me.rank;
     });
 
     // Single-day vs par values are whole numbers; format without decimals
-    const fmtVsPar    = v => v === 0 ? 'E' : (v > 0 ? '+' + v : String(v));
-    const vsParValCls = v => v < 0 ? 'under' : v === 0 ? 'even' : 'over';
+    const fmtVsPar    = v => !isFinite(v) ? '—' : v === 0 ? 'E' : (v > 0 ? '+' + v : String(v));
+    const vsParValCls = v => !isFinite(v) ? 'even' : v < 0 ? 'under' : v === 0 ? 'even' : 'over';
 
     bestWorstRowHtml = `
       <div class="history-stat-row">
@@ -2893,7 +3118,7 @@ async function fetchAll(token) {
 
       seedIsStale = knownStale || noRecordButEarly;
       if (!seedIsStale) {
-        const layout = generateLayout(seed);
+        const layout = generateLayout(seed, getTodayDateKey());
         renderLayout(seed, layout);
         seededPar   = layout.totalPar;
         todaySeed   = seed;
@@ -3703,40 +3928,17 @@ function invalidateRatingCache() { dgvRatingCache = null; }
 //  Right: holes 5-9 (no title)
 //  Both update whenever the layout changes (today/yesterday toggle)
 // ═══════════════════════════════════════════════════════════════════
-const SIDE_PHOTO_PREFIX = {
-  'Sunshine Glade':    'SG',
-  'Blueberry Thicket': 'BT',
-  'Oak Hill':          'OH',
-  'Lakeside':          'LS',
-  'Windswept Fields':  'WF',
-  'Harrowing Woods':   'HW',
-  'The Crows Nest':    'CN',
-  'Grizzly Gulch':     'GG'
-};
-
-const SIDE_COURSE_COLORS = {
-  'Sunshine Glade':    'var(--course-sunshine)',
-  'Blueberry Thicket': 'var(--course-blueberry)',
-  'Oak Hill':          'var(--course-oakhill)',
-  'Lakeside':          'var(--course-lakeside)',
-  'Windswept Fields':  'var(--course-windswept)',
-  'Harrowing Woods':   'var(--course-harrowing)',
-  'The Crows Nest':    'var(--course-crows)',
-  'Grizzly Gulch':     'var(--course-grizzly)'
-};
-
 function buildSidePanelHoles(layout) {
   if (!layout || !layout.courses) return [];
   const holes = [];
   layout.courses.forEach((entry, ci) => {
-    const prefix = SIDE_PHOTO_PREFIX[entry.course.name] || '';
-    const color  = SIDE_COURSE_COLORS[entry.course.name] || 'var(--green-neon)';
+    const color  = getCourseColor(entry.course.name);
     entry.holes.forEach((h, hi) => {
       holes.push({
         layoutHole: ci * 3 + hi + 1,
         par:        h.par,
         dist:       getHoleDist(entry.course.name, h.holeNum),
-        photo:      `holes/${prefix}${h.holeNum}.png`,
+        photo:      getHolePhotoPath(entry.course.name, h.holeNum),
         color:      color,
       });
     });
@@ -3750,16 +3952,32 @@ function sideHolePhotoHtml(h) {
   // depending on browser text-justify behavior around whitespace.
   return `
     <div class="side-hole-pip">
-      <img class="side-hole-img" style="--hole-color:${h.color}" src="${h.photo}" alt="Hole ${h.layoutHole}"/>
+      <img class="side-hole-img" style="--hole-color:${h.color}" src="${h.photo}" alt="Hole ${h.layoutHole}" onerror="sideImgFallback(this)"/>
       <div class="side-hole-label">
         <span class="side-hole-label-item">Hole <span class="side-hole-label-white">${h.layoutHole}</span></span>
-        <span class="side-hole-label-item">PAR ${h.par}</span>
+        <span class="side-hole-label-item">PAR ${h.par ?? '?'}</span>
         <span class="side-hole-label-item">${h.dist}</span>
       </div>
     </div>`;
 }
 
 let _lastSidePanelLayout = null;
+
+// Swaps a missing hole photo for a "Photo coming soon" box (same 16:9
+// footprint as a real photo) instead of a broken-image icon — lets new
+// courses go live before their photos are uploaded.
+function sideImgFallback(img) {
+  const box = document.createElement('div');
+  box.className = 'side-hole-placeholder-box';
+  box.style.borderColor = img.style.getPropertyValue('--hole-color') || '';
+  box.innerHTML = '<span class="side-hole-placeholder-text">Photo<br>Coming Soon</span>';
+  const wrap = img.closest('.side-hole-photo-wrap');
+  if (wrap) {
+    const overlay = wrap.querySelector('.side-hole-waiting-overlay');
+    if (overlay) overlay.remove();
+  }
+  img.replaceWith(box);
+}
 
 // Builds the "TODAY'S LAYOUT" / "YESTERDAY'S LAYOUT" title box markup for
 // the left side panel's top section (spL0). Extracted so both the real
@@ -4109,18 +4327,6 @@ window.addEventListener('resize', applyMarquee);
   </div>
 
   <script>
-  // Course name to filename abbreviation map
-  const COURSE_ABBR = {
-    'Sunshine Glade':    'SG',
-    'Blueberry Thicket': 'BT',
-    'Oak Hill':          'OH',
-    'Lakeside':          'LS',
-    'Windswept Fields':  'WF',
-    'Harrowing Woods':   'HW',
-    'The Crows Nest':    'CN',
-    'Grizzly Gulch':     'GG'
-  };
-
   let slideshowHoles  = [];
   let slideshowCursor = 0;
   let slideSwipeStartX = 0;
@@ -4137,7 +4343,7 @@ window.addEventListener('resize', applyMarquee);
 
   function openHoleSlideshow() {
     const layout = viewingYesterday && yesterdaySnapshot && yesterdaySnapshot.seed
-      ? generateLayout(yesterdaySnapshot.seed)
+      ? generateLayout(yesterdaySnapshot.seed, getYesterdayDateKey())
       : todayLayout;
     if (!layout) return;
 
@@ -4183,8 +4389,7 @@ window.addEventListener('resize', applyMarquee);
 
   function updateHoleSlide(animate) {
     const h      = slideshowHoles[slideshowCursor];
-    const abbr   = COURSE_ABBR[h.course] || 'XX';
-    const imgSrc = 'holes/' + abbr + h.holeNum + '.png';
+    const imgSrc = getHolePhotoPath(h.course, h.holeNum);
 
     const wrap = document.getElementById('holeImgWrap');
     const existing = wrap.querySelector('img');
