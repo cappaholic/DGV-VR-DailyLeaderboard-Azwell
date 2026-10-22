@@ -222,50 +222,96 @@ jobs:
                 return lo
               return lo + int((self._internal_sample() / 2147483647.0) * rng)
 
-          # Exact copy of the COURSES table in index.html — keep these two
-          # in sync any time courses/holes change on the front end.
-          COURSES = [
-            {"name": "Sunshine Glade",    "holes": [3,3,3,3,4]},
-            {"name": "Blueberry Thicket", "holes": [3,3,4,3,3,3,3,3,3]},
-            {"name": "Oak Hill",          "holes": [4,3,4,4,4,4,4,4,3]},
-            {"name": "Lakeside",          "holes": [3,4,3,5,4,3,3,3,5]},
-            {"name": "Windswept Fields",  "holes": [3,4,4,3,4,3,3,3,3]},
-            {"name": "Harrowing Woods",   "holes": [3,3,3,3,4,4,3,4,5]},
-            {"name": "The Crows Nest",    "holes": [3,3,4,4,3,3,4,3,4]},
-            {"name": "Grizzly Gulch",     "holes": [3,3,4,3,4,4,3,4,3]},
+          # ── Course data — MUST match COURSE_DATA / COURSE_POOLS in ──
+          # ── index.html. Pars only (distances aren't needed here).   ──
+          # None = par not confirmed yet. A layout containing an
+          # unconfirmed hole saves par/vsPar as null instead of a wrong
+          # number; the website skips null days for VS Par stats.
+          COURSE_PARS = {
+            "Sunshine Glade":    [3,3,3,3,4],
+            "Blueberry Thicket": [3,3,4,3,3,3,3,3,3],
+            "Oak Hill":          [4,3,4,4,4,4,4,4,3],
+            "Lakeside":          [3,4,3,5,4,3,3,3,5],
+            "Windswept Fields":  [3,4,4,3,4,3,3,3,3],
+            "Harrowing Woods":   [3,3,3,3,4,4,3,4,5],
+            "The Crows Nest":    [3,3,4,4,3,3,4,3,4],
+            "Grizzly Gulch":     [3,3,4,3,4,4,3,4,3],
+            # New courses (pending release) — fill in remaining pars
+            "Kaho Park":         [None,None,None,None,None,4,None,None,None],
+            "Owlwood":           [None,None,3,None,None,None,None,None,None],
+            "Coyote Canyon":     [None,None,None,None,4,None,None,None,None],
+            "Kaho Backwoods":    [None,None,3,None,None,None,None,None,None],
+          }
+
+          # Date-versioned course pools — ORDER MATTERS (must match the
+          # game's internal list). NEW_COURSES_START_DATE must be the
+          # SAME value as in index.html; None = new courses not live yet.
+          NEW_COURSES_START_DATE = None   # e.g. "2026-10-23"
+          ORIGINAL_8 = ["Sunshine Glade", "Blueberry Thicket", "Oak Hill", "Lakeside",
+                        "Windswept Fields", "Harrowing Woods", "The Crows Nest", "Grizzly Gulch"]
+          COURSE_POOLS = [
+            {"id": "v1", "start": None, "courses": ORIGINAL_8},
+            {"id": "v2", "start": NEW_COURSES_START_DATE,
+             "courses": ORIGINAL_8 + ["Kaho Park", "Owlwood", "Coyote Canyon", "Kaho Backwoods"]},
           ]
 
-          # Mathematically exact bounds given the COURSES data above —
-          # any computed par outside this range is provably impossible.
-          PAR_MIN, PAR_MAX = 27, 39
+          def get_course_pool(date_key):
+            active = COURSE_POOLS[0]
+            for p in COURSE_POOLS:
+              if p["start"] and p["start"] <= date_key:
+                active = p
+            return active
 
-          def generate_layout_par(seed):
+          def par_bounds(pool_names):
+            # Exact min/max total par for a pool: best/worst 3-hole sum per
+            # course, then the best/worst 3 courses. Unconfirmed holes are
+            # ignored here (those layouts never get a par anyway).
+            lows, highs = [], []
+            for name in pool_names:
+              known = sorted(p for p in COURSE_PARS[name] if p is not None)
+              if len(known) >= 3:
+                lows.append(sum(known[:3])); highs.append(sum(known[-3:]))
+            lows.sort(); highs.sort(reverse=True)
+            return sum(lows[:3]), sum(highs[:3])
+
+          def generate_layout_par(seed, pool_names):
             rng  = SystemRandom(seed)
-            pool = list(range(len(COURSES)))
+            pool = list(pool_names)
             selected = []
             for _ in range(3):
               idx = rng.next_range(0, len(pool))
               selected.append(pool.pop(idx))
 
             total = 0
-            for course_idx in selected:
-              holes = COURSES[course_idx]["holes"]
+            for name in selected:
+              holes = COURSE_PARS[name]
               keyed = [(i, par, rng.next()) for i, par in enumerate(holes)]
               keyed.sort(key=lambda x: x[2])
-              total += sum(par for (_, par, _) in keyed[:3])
+              picked = [par for (_, par, _) in keyed[:3]]
+              if any(p is None for p in picked):
+                print(f"::warning::Layout includes a {name} hole with no confirmed par — saving par/vsPar as null for today.")
+                return None
+              total += sum(picked)
             return total
+
+          active_pool = get_course_pool(today_str)
+          PAR_MIN, PAR_MAX = par_bounds(active_pool["courses"])
+          print(f"Course pool for {today_str}: {active_pool['id']} ({len(active_pool['courses'])} courses)")
 
           total_par   = None
           par_suspect = False
           if seed_value is not None:
             try:
-              total_par = generate_layout_par(seed_value)
+              total_par = generate_layout_par(seed_value, active_pool["courses"])
               print(f"Computed total par from seed: {total_par}")
-              if not (PAR_MIN <= total_par <= PAR_MAX):
+              if total_par is None:
+                pass
+              elif not (PAR_MIN <= total_par <= PAR_MAX):
                 par_suspect = True
                 print(f"::warning::Computed par ({total_par}) is outside the theoretically possible range ({PAR_MIN}-{PAR_MAX}). Flagging this day as par-suspect.")
-              for p in history_players:
-                p["vsPar"] = p["score"] - total_par
+              if total_par is not None:
+                for p in history_players:
+                  p["vsPar"] = p["score"] - total_par
             except Exception as e:
               print(f"Par computation failed: {e}")
 
