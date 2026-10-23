@@ -236,23 +236,27 @@ jobs:
             "Harrowing Woods":   [3,3,3,3,4,4,3,4,5],
             "The Crows Nest":    [3,3,4,4,3,3,4,3,4],
             "Grizzly Gulch":     [3,3,4,3,4,4,3,4,3],
-            # New courses (pending release) — fill in remaining pars
-            "Kaho Park":         [None,None,None,None,None,4,None,None,None],
-            "Owlwood":           [None,None,3,None,None,None,None,None,None],
-            "Coyote Canyon":     [None,None,None,None,4,None,None,None,None],
-            "Kaho Backwoods":    [None,None,3,None,None,None,None,None,None],
+            # New courses (pars from the in-game scorecards)
+            "Kaho Park":         [3,5,3,4,3,4,5,3,3],
+            "Owlwood":           [3,4,3,3,3,3,3,4,3],
+            "Coyote Canyon":     [3,4,4,3,4,3,3,3,4],
+            "Kaho Backwoods":    [3,4,3,5,3,3,3,4,4],
           }
 
           # Date-versioned course pools — ORDER MATTERS (must match the
           # game's internal list). NEW_COURSES_START_DATE must be the
           # SAME value as in index.html; None = new courses not live yet.
-          NEW_COURSES_START_DATE = None   # e.g. "2026-10-23"
+          NEW_COURSES_START_DATE = "2026-10-23"   # first window seen using all 12 courses
           ORIGINAL_8 = ["Sunshine Glade", "Blueberry Thicket", "Oak Hill", "Lakeside",
                         "Windswept Fields", "Harrowing Woods", "The Crows Nest", "Grizzly Gulch"]
           COURSE_POOLS = [
             {"id": "v1", "start": None, "courses": ORIGINAL_8},
             {"id": "v2", "start": NEW_COURSES_START_DATE,
-             "courses": ORIGINAL_8 + ["Kaho Park", "Owlwood", "Coyote Canyon", "Kaho Backwoods"]},
+             # Same order as COURSE_POOLS v2 in index.html (partly confirmed —
+             # see the notes there). Keep the two identical.
+             "courses": ["Sunshine Glade", "Blueberry Thicket", "Oak Hill", "Lakeside",
+                         "Windswept Fields", "Kaho Park", "Kaho Backwoods", "Owlwood",
+                         "Harrowing Woods", "The Crows Nest", "Coyote Canyon", "Grizzly Gulch"]},
           ]
 
           def get_course_pool(date_key):
