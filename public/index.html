@@ -2159,29 +2159,28 @@ const COURSE_DATA = {
   },
 
   // ── New courses (pending release) ─────────────────────────────────
-  // Distances confirmed from the course chart. Pars: null = not yet
-  // confirmed. Known so far from tee signs: KP6=4, OW3=3, CC5=4, KB3=3.
+  // Distances from the course chart; pars from the in-game scorecards.
   'Kaho Park': {
     abbr: 'KP', color: 'var(--course-kahopark)',
-    pars: [null,null,null,null,null,4,null,null,null],
+    pars: [3,5,3,4,3,4,5,3,3],
     ft:   [495,673,369,816,365,612,943,342,437],
     m:    [151,205,113,249,111,187,287,104,133],
   },
   'Owlwood': {
     abbr: 'OW', color: 'var(--course-owlwood)',
-    pars: [null,null,3,null,null,null,null,null,null],
+    pars: [3,4,3,3,3,3,3,4,3],
     ft:   [417,513,326,243,454,427,383,639,461],
     m:    [127,156,99,74,138,130,117,195,140],
   },
   'Coyote Canyon': {
     abbr: 'CC', color: 'var(--course-coyote)',
-    pars: [null,null,null,null,4,null,null,null,null],
+    pars: [3,4,4,3,4,3,3,3,4],
     ft:   [390,566,650,455,673,497,493,290,872],
     m:    [119,172,198,139,205,152,150,88,266],
   },
   'Kaho Backwoods': {
     abbr: 'KB', color: 'var(--course-backwoods)',
-    pars: [null,null,3,null,null,null,null,null,null],
+    pars: [3,4,3,5,3,3,3,4,4],
     ft:   [471,688,453,840,470,397,329,778,440],
     m:    [143,210,138,256,143,121,100,237,134],
   },
@@ -2209,7 +2208,7 @@ const COURSE_DATA = {
 //  Add ?coursePool=v2 to the URL to force today's layout onto the new
 //  pool (only for that browser tab, only for today's layout).
 // ═══════════════════════════════════════════════════════════════════
-const NEW_COURSES_START_DATE = null; // e.g. '2026-10-20'
+const NEW_COURSES_START_DATE = '2026-10-23'; // first window seen using all 12 courses
 
 const COURSE_POOLS = [
   {
@@ -2223,15 +2222,29 @@ const COURSE_POOLS = [
   {
     id: 'v2',
     start: NEW_COURSES_START_DATE,
-    // Order confirmed: the 4 new courses are appended to the end of the
-    // game's existing course list, in this order. If a real Daily Challenge
-    // ever disagrees, findCoursePoolOrder() below will identify the fix.
+    // PARTLY CONFIRMED. The real Daily Challenges in OBSERVED_LAYOUTS below
+    // pin these positions (1-based): 1 Sunshine Glade, 8 Owlwood,
+    // 10 The Crows Nest, 11 Coyote Canyon. Harrowing Woods at 9 is very
+    // likely (it's what makes Oct 22 come out identical under both lists).
+    // Where Kaho Park / Kaho Backwoods sit among positions 2-7 is still a
+    // best guess; the startup check below flags any observed day that
+    // disagrees, and findCoursePoolOrder() can solve it from observations.
     courses: [
       'Sunshine Glade', 'Blueberry Thicket', 'Oak Hill', 'Lakeside',
-      'Windswept Fields', 'Harrowing Woods', 'The Crows Nest', 'Grizzly Gulch',
-      'Kaho Park', 'Owlwood', 'Coyote Canyon', 'Kaho Backwoods',
+      'Windswept Fields', 'Kaho Park', 'Kaho Backwoods', 'Owlwood',
+      'Harrowing Woods', 'The Crows Nest', 'Coyote Canyon', 'Grizzly Gulch',
     ],
   },
+];
+
+// Real Daily Challenge layouts as played in the game. Add one line per
+// day (especially any day with a new course) — the more there are, the
+// more the v2 order is locked in. holes = hole numbers per course, in
+// play order. Checked automatically on page load (see console).
+const OBSERVED_LAYOUTS = [
+  { date: '2026-10-23', seed: 7498,
+    courses: ['Coyote Canyon', 'The Crows Nest', 'Owlwood'],
+    holes:   [[3,5,7], [9,1,2], [5,2,1]] },
 ];
 
 const POOL_OVERRIDE = (() => {
@@ -2269,6 +2282,19 @@ function getCourseColor(name) {
 function getHolePhotoPath(name, holeNum) {
   const abbr = (COURSE_DATA[name] && COURSE_DATA[name].abbr) || 'XX';
   return `holes/${abbr}${holeNum}.png`;
+}
+
+// Startup check — every observed real layout must be reproduced exactly
+// by the pool active on its date.
+function checkObservedLayouts() {
+  OBSERVED_LAYOUTS.forEach(obs => {
+    const pool = COURSE_POOLS.slice().reverse().find(p => !p.start || p.start <= obs.date) || COURSE_POOLS[0];
+    const L = generateLayoutFromPool(obs.seed, pool.courses);
+    const ok = L.courses.every((c, ci) =>
+      c.course.name === obs.courses[ci] &&
+      c.holes.every((h, hi) => h.holeNum === obs.holes[ci][hi]));
+    if (!ok) console.error(`[DGVR] Pool ${pool.id} does NOT reproduce the real layout for ${obs.date} (seed ${obs.seed}). Run findCoursePoolOrder(OBSERVED_LAYOUTS.filter(o => o.date >= NEW_COURSES_START_DATE)) to find the correct order.`);
+  });
 }
 
 // Startup sanity check — logs loudly in the console if any course in a
@@ -2322,6 +2348,8 @@ function generateLayoutFromPool(seed, poolNames) {
   // formatVsPar() already handles a null par by showing raw strokes.
   return { courses, totalPar };
 }
+
+checkObservedLayouts();
 
 // dateKey: the YYYY-MM-DD daily window the seed belongs to (defaults to
 // today). Always pass it for anything that isn't today's live layout.
