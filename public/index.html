@@ -2208,7 +2208,7 @@ const COURSE_DATA = {
 //  Add ?coursePool=v2 to the URL to force today's layout onto the new
 //  pool (only for that browser tab, only for today's layout).
 // ═══════════════════════════════════════════════════════════════════
-const NEW_COURSES_START_DATE = '2026-10-23'; // first window seen using all 12 courses
+const NEW_COURSES_START_DATE = '2026-10-23'; // first Daily Challenge with the new courses (Thu Oct 22 8 PM ET, after the hotfix)
 
 const COURSE_POOLS = [
   {
@@ -2222,17 +2222,17 @@ const COURSE_POOLS = [
   {
     id: 'v2',
     start: NEW_COURSES_START_DATE,
-    // PARTLY CONFIRMED. The real Daily Challenges in OBSERVED_LAYOUTS below
-    // pin these positions (1-based): 1 Sunshine Glade, 8 Owlwood,
-    // 10 The Crows Nest, 11 Coyote Canyon. Harrowing Woods at 9 is very
-    // likely (it's what makes Oct 22 come out identical under both lists).
-    // Where Kaho Park / Kaho Backwoods sit among positions 2-7 is still a
-    // best guess; the startup check below flags any observed day that
-    // disagrees, and findCoursePoolOrder() can solve it from observations.
+    // PARTLY CONFIRMED by the real Daily Challenges in OBSERVED_LAYOUTS
+    // below. Confirmed positions (1-based): 2 Blueberry Thicket,
+    // 6 Grizzly Gulch, 8 Owlwood, 10 The Crows Nest, 11 Coyote Canyon.
+    // Best guess for the rest: 1, 3, 4, 5, 7, 9, 12 (Sunshine Glade,
+    // Oak Hill, Lakeside, Windswept Fields, Kaho Park, Harrowing Woods,
+    // Kaho Backwoods).
+    // The startup check flags any observed day that disagrees.
     courses: [
       'Sunshine Glade', 'Blueberry Thicket', 'Oak Hill', 'Lakeside',
-      'Windswept Fields', 'Kaho Park', 'Kaho Backwoods', 'Owlwood',
-      'Harrowing Woods', 'The Crows Nest', 'Coyote Canyon', 'Grizzly Gulch',
+      'Windswept Fields', 'Grizzly Gulch', 'Kaho Park', 'Owlwood',
+      'Harrowing Woods', 'The Crows Nest', 'Coyote Canyon', 'Kaho Backwoods',
     ],
   },
 ];
@@ -2245,6 +2245,9 @@ const OBSERVED_LAYOUTS = [
   { date: '2026-10-23', seed: 7498,
     courses: ['Coyote Canyon', 'The Crows Nest', 'Owlwood'],
     holes:   [[3,5,7], [9,1,2], [5,2,1]] },
+  { date: '2026-10-24', seed: 41,
+    courses: ['Blueberry Thicket', 'Coyote Canyon', 'Grizzly Gulch'],
+    holes:   [[5,6,4], [5,8,9], [7,9,6]] },
 ];
 
 const POOL_OVERRIDE = (() => {
