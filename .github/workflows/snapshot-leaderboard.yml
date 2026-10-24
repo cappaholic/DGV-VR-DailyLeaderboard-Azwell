@@ -246,7 +246,7 @@ jobs:
           # Date-versioned course pools — ORDER MATTERS (must match the
           # game's internal list). NEW_COURSES_START_DATE must be the
           # SAME value as in index.html; None = new courses not live yet.
-          NEW_COURSES_START_DATE = "2026-10-23"   # first window seen using all 12 courses
+          NEW_COURSES_START_DATE = "2026-10-23"   # first Daily Challenge with the new courses (after the hotfix)
           ORIGINAL_8 = ["Sunshine Glade", "Blueberry Thicket", "Oak Hill", "Lakeside",
                         "Windswept Fields", "Harrowing Woods", "The Crows Nest", "Grizzly Gulch"]
           COURSE_POOLS = [
@@ -255,8 +255,8 @@ jobs:
              # Same order as COURSE_POOLS v2 in index.html (partly confirmed —
              # see the notes there). Keep the two identical.
              "courses": ["Sunshine Glade", "Blueberry Thicket", "Oak Hill", "Lakeside",
-                         "Windswept Fields", "Kaho Park", "Kaho Backwoods", "Owlwood",
-                         "Harrowing Woods", "The Crows Nest", "Coyote Canyon", "Grizzly Gulch"]},
+                         "Windswept Fields", "Grizzly Gulch", "Kaho Park", "Owlwood",
+                         "Harrowing Woods", "The Crows Nest", "Coyote Canyon", "Kaho Backwoods"]},
           ]
 
           def get_course_pool(date_key):
